@@ -7,7 +7,7 @@ from datetime import datetime
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-
+# This is the SOC block
 class BatteryRNNCell(Layer):
     def __init__(self, initial_state=None, dt=1.0, qMobile=7600, **kwargs):
         super(BatteryRNNCell, self).__init__(**kwargs)
