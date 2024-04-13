@@ -1,5 +1,7 @@
+# CS7643-DEEP LEARNING PROJECT 
 # Li-ion Battery Prognosis Based on Hybrid Bayesian PINN
-Code for the paper:
+# Original Code at :https://github.com/nasa/Li-ion-Battery-Prognosis-Based-on-Hybrid-Bayesian-PINN
+Augmented Code for the paper:
 Nascimento, Viana, Corbetta, Kulkarni.
 [A Framework for Li-ion Battery Prognosis Based on Hybrid Bayesian Physics-Informed Neural Networks](https://www.nature.com/articles/s41598-023-33018-0). Nature Scientific Reports, 2023.
 
