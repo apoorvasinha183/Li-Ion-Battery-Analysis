@@ -155,4 +155,5 @@ plt.grid()
 
 plt.xlabel('Time (s)')
 # %%
+plt.savefig('TF/figures/rwdata.png')
 plt.show()
