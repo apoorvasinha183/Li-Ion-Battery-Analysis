@@ -21,17 +21,20 @@ dt = np.diff(data_RW[1][2,0])[1]
 
 inputs = None
 target = None
+#TODO : Readout the dataset
+#TODO: Extreme diversity in sequence lengths: Is it appropriate?
 for k,v in data_RW.items():
+    #TODO: Explain this
     for i,d in enumerate(v[1,:][:max_idx_to_use]):
         prep_inp = np.full(max_size, np.nan)
         prep_target = np.full(max_size, np.nan)
-        prep_inp[:len(d)] = d
-        prep_target[:len(v[0,:][i])] = v[0,:][i]
+        prep_inp[:len(d)] = d   #Current Sequence
+        prep_target[:len(v[0,:][i])] = v[0,:][i] #Voltage sequence
         if inputs is None:
             inputs = prep_inp
             target = prep_target
         else:
-            inputs = np.vstack([inputs, prep_inp])
+            inputs = np.vstack([inputs, prep_inp])   
             target = np.vstack([target, prep_target])
 
 inputs = inputs[:,:,np.newaxis]
@@ -55,13 +58,16 @@ for row in np.argwhere((target<EOD) | (np.isnan(target))):
 
 val_idx = np.linspace(0,35,6,dtype=int)
 train_idx = [i for i in np.arange(0,36) if i not in val_idx]
-
+print(train_idx)
+print(val_idx)
 time_window_size = inputs.shape[1]  # 310
+#time_window_size = 310
+print("this is ",time_window_size)
 model = get_model(batch_input_shape=(inputs[train_idx,:,:].shape[0],time_window_size,inputs.shape[2]), dt=dt, mlp=True, share_q_r=False, stateful=True)
-# model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-3), loss="mse", metrics=["mae"], sample_weight_mode="temporal")
+#model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-3), loss="mse", metrics=["mae"], sample_weight_mode="temporal")
 model.compile(optimizer=tf.keras.optimizers.Adam(lr=2e-2), loss="mse", metrics=["mae"])
 model.summary()
-
+#huzzah
 # samples_intervals           = [100, 100, 150, 100, 200,  50,  40, max_size-740]
 # samples_intervals_weights   = [1.0, 1.0, 0.5, 1.0, 0.5, 1.0, 1.0, 10.0         ]
 

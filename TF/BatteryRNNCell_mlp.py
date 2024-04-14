@@ -35,7 +35,7 @@ class BatteryRNNCell(Layer):
 
         self.state_size  = tensor_shape.TensorShape(8)
         self.output_size = tensor_shape.TensorShape(1)
-
+        #TODO : State explcitly in report the asymmetry in modelling electrodes
         self.MLPp = Sequential([
             # Dense(8, activation='tanh', input_shape=(1,), dtype=self.dtype, kernel_regularizer=tf.keras.regularizers.l2(0.001)),
             Dense(8, activation='tanh', input_shape=(1,), dtype=self.dtype),

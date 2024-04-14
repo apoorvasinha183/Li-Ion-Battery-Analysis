@@ -67,14 +67,14 @@ BATCH_SIZE = inputs.shape[0]
 
 
 # # generate artificial data
-# BATCH_SIZE = 36
-# dt = 10.0
-# time_window_size = 700
-# inputs = np.ones((time_window_size,BATCH_SIZE), dtype=DTYPE) * np.linspace(1.0,2.0,BATCH_SIZE)  # uniform constant load
-# inputs = inputs.T[:,:,np.newaxis]
-# model = get_model(batch_input_shape=inputs.shape, dt=dt)
-# model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
-# target = model.predict(inputs)
+BATCH_SIZE = 36
+dt = 10.0
+time_window_size = 700
+inputs = np.ones((time_window_size,BATCH_SIZE), dtype=DTYPE) * np.linspace(1.0,2.0,BATCH_SIZE)  # uniform constant load
+inputs = inputs.T[:,:,np.newaxis]
+model = get_model(batch_input_shape=inputs.shape, dt=dt)
+model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
+target = model.predict(inputs)
 
 
 # move timesteps with earlier EOD
@@ -94,8 +94,8 @@ for row in np.argwhere((target<EOD) | (np.isnan(target))):
 
 time_window_size = inputs.shape[1]  # 310
 
-checkpoint_filepath = './training/cp_mlp_save4.ckpt'
-
+#checkpoint_filepath = './training/cp_mlp_save4.ckpt'
+checkpoint_filepath = './training/cp_mlp.ckpt'
 SIMULATION_OVER_STEPS = 200
 inputs_shiffed = np.hstack([inputs_shiffed, inputs_shiffed[:, -SIMULATION_OVER_STEPS:]])
 inputs = np.hstack([inputs, inputs[:, -SIMULATION_OVER_STEPS:]])
@@ -117,6 +117,8 @@ reach_EOD_all = reach_EOD
 
 model_eval = get_model(batch_input_shape=(1,time_window_size-SIMULATION_OVER_STEPS,1), dt=dt, mlp=True, share_q_r=False)
 model_eval.compile(optimizer='adam', loss="mse", metrics=["mae"])
+print(inputs.shape)
+#TODO: Shape mismatch here
 model = get_model(batch_input_shape=inputs.shape, dt=dt, mlp=True, share_q_r=False)
 model.compile(optimizer='adam', loss="mse", metrics=["mae"])
 
@@ -261,7 +263,7 @@ plt.grid()
 fig = plt.figure('MLPn')
 plt.plot(xi, model.layers[0].cell.MLPn(xi[:,np.newaxis]))
 plt.grid()
-
+#TODO: The best weights are here!
 # np.save('MLPp_best_weights.npy', model.layers[0].cell.MLPp.get_weights())
 # np.save('MLPn_best_weights.npy', model.layers[0].cell.MLPn.get_weights())
 
