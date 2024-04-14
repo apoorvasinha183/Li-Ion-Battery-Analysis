@@ -28,7 +28,8 @@ if __name__ == "__main__":
     inputs = np.ones((700,1000), dtype=DTYPE) * np.linspace(1.0,2.0,1000)  # constant load
     inputs = inputs.T[:,:,np.newaxis]
 
-    model = get_model(batch_input_shape=inputs.shape, dt=10.0, mlp=True)
+    #model = get_model(batch_input_shape=inputs.shape, dt=10.0, mlp=True)
+    model = get_model(batch_input_shape=inputs.shape, dt=10.0, mlp=False)
     model.summary()
 
     start = time()

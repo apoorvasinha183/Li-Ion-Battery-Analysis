@@ -195,19 +195,21 @@ plt.grid()
 fig.savefig('./figures/k_fold_MSE.png')
 
 # load model weights of base train
-checkpoint_filepath_base = './training/cp_mlp_save4.ckpt'
-model_base = get_model(batch_input_shape=inputs_all.shape, dt=dt, mlp=True, share_q_r=False)
-model_base.load_weights(checkpoint_filepath_base)
-weights_base = model_base.get_weights()
+ENABLE = True
+if ENABLE:
+    checkpoint_filepath_base = './training/cp_mlp.ckpt'
+    model_base = get_model(batch_input_shape=inputs_all.shape, dt=dt, mlp=True, share_q_r=False)
+    model_base.load_weights(checkpoint_filepath_base)
+    weights_base = model_base.get_weights()
 
-mse_base = np.zeros(inputs_all.shape[0])
-weights_eval = weights_base.copy()
-for i in range(inputs_all.shape[0]):
-    weights_eval[0] = np.reshape(weights_base[0][i], (1,))
-    weights_eval[1] = np.reshape(weights_base[1][i], (1,))
-    model_eval.set_weights(weights_eval)
-    mse_base[i] = model_eval.evaluate(inputs_shiffed_all[i,:target_shiffed_all.shape[1],:][np.newaxis,:,:], target_shiffed_all[i,:][np.newaxis,:,np.newaxis], verbose=0)[0]
-    # print("MSE[{}]: {}".format(i, mse[i]))
+    mse_base = np.zeros(inputs_all.shape[0])
+    weights_eval = weights_base.copy()
+    for i in range(inputs_all.shape[0]):
+        weights_eval[0] = np.reshape(weights_base[0][i], (1,))
+        weights_eval[1] = np.reshape(weights_base[1][i], (1,))
+        model_eval.set_weights(weights_eval)
+        mse_base[i] = model_eval.evaluate(inputs_shiffed_all[i,:target_shiffed_all.shape[1],:][np.newaxis,:,:], target_shiffed_all[i,:][np.newaxis,:,np.newaxis], verbose=0)[0]
+        # print("MSE[{}]: {}".format(i, mse[i]))
 
 fig = plt.figure()
 # sns.kdeplot(mse_base, shade=True, color='gray')
@@ -218,7 +220,7 @@ fig = plt.figure()
 # plt.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
 # plt.grid()
 X_plot = np.linspace(0.0, 5e-4)
-kde = KernelDensity(kernel='gaussian', bandwidth=3e-5).fit(mse_base[:,np.newaxis])
+kde = KernelDensity(kernel='gaussian', bandwidth=3e-5).fit(mse_all[:,np.newaxis])  #Eh ,whatever works
 log_dens = kde.score_samples(X_plot[:,np.newaxis])
 plt.fill_between(X_plot, np.exp(log_dens), color='gray', alpha=0.3)
 for i in range(R_0_all.shape[0]):

@@ -77,7 +77,7 @@ for kfold in range(K_FOLDS):
     time_window_size = inputs.shape[1]  # 310
     model = get_model(batch_input_shape=(len(train_idx),time_window_size,inputs.shape[2]), dt=dt, mlp=True, share_q_r=False, stateful=True)
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=2e-2), loss="mse", metrics=["mae"])
-
+    model.summary()
     checkpoint_filepath = './training/cp_mlp_kfold_{}.ckpt'.format(kfold)
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_filepath,

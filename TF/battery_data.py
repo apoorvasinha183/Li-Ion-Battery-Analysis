@@ -4,7 +4,7 @@ from scipy.io import loadmat
 #This one extracts the datasets for one set.
 #DATA_PATH = '../data/'
 #TODO: DATA_PATH needs to be consistently defined.
-DATA_PATH = 'data/'
+DATA_PATH = '../data/'
 BATTERY_FILES = {
     1: 'Battery_Uniform_Distribution_Variable_Charge_Room_Temp_DataSet_2Post/data/Matlab/RW{}.mat',
     2: 'Battery_Uniform_Distribution_Variable_Charge_Room_Temp_DataSet_2Post/data/Matlab/RW{}.mat',
