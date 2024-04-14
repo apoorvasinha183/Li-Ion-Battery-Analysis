@@ -1,0 +1,1 @@
+ Right now only the SOC part should run wihtout any hiccups . You can run a basic training loop here.
