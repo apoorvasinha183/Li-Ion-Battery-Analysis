@@ -35,9 +35,9 @@ class BatteryRNNCell(Layer):
 
         self.state_size  = tensor_shape.TensorShape(8)
         self.output_size = tensor_shape.TensorShape(1)
-        #TODO : State explcitly in report the asymmetry in modelling electrodes
+        
         self.MLPp = Sequential([
-            # Dense(8, activation='tanh', input_shape=(1,), dtype=self.dtype, kernel_regularizer=tf.keras.regularizers.l2(0.001)),
+            
             Dense(8, activation='tanh', input_shape=(1,), dtype=self.dtype),
             Dense(4, activation='tanh', dtype=self.dtype),
             Dense(1, dtype=self.dtype),
@@ -45,7 +45,7 @@ class BatteryRNNCell(Layer):
 
         X = np.linspace(0.0,1.0,100)
 
-        #self.MLPp.set_weights(np.load('/Users/mcorbet1/OneDrive - NASA/Code/Projects/PowertrainPINN/scripts/TF/training/mlp_initial_weights.npy',allow_pickle=True))
+        
         self.MLPp.set_weights(np.load('../training/mlp_initial_weight_with-I.npy',allow_pickle=True))
 
         Y = np.linspace(-8e-4,8e-4,100)
@@ -81,17 +81,13 @@ class BatteryRNNCell(Layer):
         P.xpMin = tf.constant(0.4, dtype=self.dtype)            # minimum mole fraction (pos electrode) -> note xn+xp=1
 
         constraint = lambda w: w * math_ops.cast(math_ops.greater(w, 0.), self.dtype)  # contraint > 0
-        # constraint_q_max = tf.keras.constraints.MinMaxNorm(min_value=0.0, max_value=1.4, rate=0.5)
+       
         constraint_q_max = lambda w: tf.clip_by_value(w, 0.0, max_q_max)
         constraint_R_0 = lambda w: tf.clip_by_value(w, min_R_0, 1.0)
-        
-        # P.qMax = P.qMobile/(P.xnMax-P.xnMin)    # note qMax = qn+qp
-        # P.Ro = tf.constant(0.117215, dtype=self.dtype)          # for Ohmic drop (current collector resistances plus electrolyte resistance plus solid phase resistances at anode and cathode)
-        # P.qMaxBASE = P.qMobile/(P.xnMax-P.xnMin)  # 100000
+     
         P.qMaxBASE = tf.constant(self.q_max_base_value, dtype=self.dtype)
         P.RoBASE = tf.constant(self.R_0_base_value, dtype=self.dtype)
-        # P.qMax = tf.Variable(np.ones(batch_size)*initial_q_max, constraint=constraint_q_max, dtype=self.dtype)  # init 0.1 - resp 0.1266
-        # P.Ro = tf.Variable(np.ones(batch_size)*initial_R_0, constraint=constraint, dtype=self.dtype)   # init 0.15 - resp 0.117215
+      
 
 
         if self.q_max_model is None:
@@ -110,11 +106,7 @@ class BatteryRNNCell(Layer):
 
         # Li-ion parameters
         P.alpha = tf.constant(0.5, dtype=self.dtype)            # anodic/cathodic electrochemical transfer coefficient
-        # P.Sn = tf.constant(0.000437545, dtype=self.dtype)       # surface area (- electrode)
-        # P.Sp = tf.constant(0.00030962, dtype=self.dtype)        # surface area (+ electrode)
-        # P.kn = tf.constant(2120.96, dtype=self.dtype)           # lumped constant for BV (- electrode)
-        # P.kp = tf.constant(248898, dtype=self.dtype)            # lumped constant for BV (+ electrode)
-        # P.Vol = tf.constant(2e-5, dtype=self.dtype)             # total interior battery volume/2 (for computing concentrations)
+    
         P.VolSFraction = tf.constant(0.1, dtype=self.dtype)     # fraction of total volume occupied by surface volume
 
         P.Sn = tf.constant(2e-4, dtype=self.dtype)       # surface area (- electrode)
@@ -123,8 +115,7 @@ class BatteryRNNCell(Layer):
         P.kp = tf.constant(2e4, dtype=self.dtype)            # lumped constant for BV (+ electrode)
         P.Vol = tf.constant(2.2e-5, dtype=self.dtype)    
 
-        # Volumes (total volume is 2*P.Vol), assume volume at each electrode is the
-        # same and the surface/bulk split is the same for both electrodes
+
         P.VolS = P.VolSFraction*P.Vol  # surface volume
         P.VolB = P.Vol - P.VolS        # bulk volume
 
@@ -144,13 +135,8 @@ class BatteryRNNCell(Layer):
         P.qSMax = P.qMax*P.qMaxBASE*P.VolS/P.Vol       # max charge at surface (pos and neg)
         P.qBMax = P.qMax*P.qMaxBASE*P.VolB/P.Vol       # max charge at bulk (pos and neg)
 
-        # time constants
-        # P.tDiffusion = tf.constant(7e6, dtype=self.dtype)  # diffusion time constant (increasing this causes decrease in diffusion rate)
-        # P.tDiffusion = tf.constant(7e6, dtype=self.dtype)  # diffusion time constant (increasing this causes decrease in diffusion rate)
-        P.tDiffusion = tf.Variable(7e6, trainable=D_trainable, dtype=self.dtype)  # diffusion time constant (increasing this causes decrease in diffusion rate)
-        # P.to = tf.constant(6.08671, dtype=self.dtype)      # for Ohmic voltage
-        # P.tsn = tf.constant(1001.38, dtype=self.dtype)     # for surface overpotential (neg)
-        # P.tsp = tf.constant(46.4311, dtype=self.dtype)     # for surface overpotential (pos)
+        
+       
 
         P.to = tf.constant(10.0, dtype=self.dtype)      # for Ohmic voltage
         P.tsn = tf.constant(90.0, dtype=self.dtype)     # for surface overpotential (neg)
@@ -174,8 +160,7 @@ class BatteryRNNCell(Layer):
         inputs = ops.convert_to_tensor(inputs, dtype=self.dtype)
         states = ops.convert_to_tensor(states, dtype=self.dtype)
         states = states[0,:]
-        if states is None:
-            states = self.get_initial_state()
+
         next_states = self.getNextState(states,inputs,training)
 
         output = self.getNextOutput(next_states,inputs,training)
@@ -185,7 +170,7 @@ class BatteryRNNCell(Layer):
     def getAparams(self):
         return self.MLPp.get_weights()
 
-    @tf.function
+   
     def getNextOutput(self,X,U,training):
         # OutputEqn   Compute the outputs of the battery model
         #
@@ -210,43 +195,32 @@ class BatteryRNNCell(Layer):
         qpB = X[:,6]
         qpS = X[:,7]
 
-        # Extract inputs
-        # P = U[:,0]
+       
         i = U[:,0]
 
         parameters = self
 
         qSMax = (parameters.qMax * parameters.qMaxBASE) * parameters.VolS/parameters.Vol
 
-        # Constraints
+        
         Tbm = Tb-273.15
         xpS = qpS/qSMax
         xnS = qnS/qSMax
 
-        # tf.print('qpS:', qpS)
-        # tf.print('xpS:', xpS)
-
-        # VepMLP = self.MLPp(tf.expand_dims(xpS,1))[:,0] * self.MLPpFACTOR
-        # VenMLP = self.MLPn(tf.expand_dims(xnS,1))[:,0] * self.MLPnFACTOR
-
-        # VepMLP = self.MLPp(tf.stack([xpS, i],1))[:,0]
         VepMLP = self.MLPp(tf.expand_dims(xpS,1))[:,0]
         VenMLP = self.MLPn(tf.expand_dims(xnS,1))[:,0]
 
-        # if training:
+       
         safe_log_p = tf.clip_by_value((1-xpS)/xpS,1e-18,1e+18)
         safe_log_n = tf.clip_by_value((1-xnS)/xnS,1e-18,1e+18)
-        # else:
-        #     safe_log_p = (1.0-xpS)/xpS
-        #     safe_log_n = (1.0-xnS)/xnS
-
+       
         Vep = parameters.U0p + parameters.R*Tb/parameters.F*tf.math.log(safe_log_p) + VepMLP
         Ven = parameters.U0n + parameters.R*Tb/parameters.F*tf.math.log(safe_log_n) + VenMLP
         V = Vep - Ven - Vo - Vsn - Vsp
 
         return tf.expand_dims(V,1, name="output")
 
-    @tf.function
+    
     def getNextState(self,X,U,training):
         # StateEqn   Compute the new states of the battery model
         #
@@ -277,22 +251,11 @@ class BatteryRNNCell(Layer):
 
         qSMax = (parameters.qMax * parameters.qMaxBASE) * parameters.VolS/parameters.Vol
 
-        # xpS = qpS/parameters.qSMax
-        # xnS = qnS/parameters.qSMax
-
-        # safe values for mole frac when training
-        # if training:
         xpS = tf.clip_by_value(qpS/qSMax,1e-18,1.0)
         xnS = tf.clip_by_value(qnS/qSMax,1e-18,1.0)
         Jn0 = 1e-18 + parameters.kn*(1-xnS)**parameters.alpha*(xnS)**parameters.alpha
         Jp0 = 1e-18 + parameters.kp*(1-xpS)**parameters.alpha*(xpS)**parameters.alpha
-        # else:
-        #     xpS = qpS/qSMax
-        #     xnS = qnS/qSMax
-        #     Jn0 = parameters.kn*(1-xnS)**parameters.alpha*(xnS)**parameters.alpha
-        #     Jp0 = parameters.kp*(1-xpS)**parameters.alpha*(xpS)**parameters.alpha
-
-        # Constraints
+        
         Tbdot = tf.zeros(X.shape[0], dtype=self.dtype)
         CnBulk = qnB/parameters.VolB
         CnSurface = qnS/parameters.VolS
@@ -333,11 +296,11 @@ class BatteryRNNCell(Layer):
         P = self
 
         if self.q_max_model is not None:
-            # P.qMax = self.q_max_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.qMaxBASE
+            
             P.qMax = tf.concat([self.q_max_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.qMaxBASE for _ in range(100)], axis=0)
 
         if self.R_0_model is not None: 
-            # P.Ro = self.R_0_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.RoBASE
+            
             P.Ro = tf.concat([self.R_0_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.RoBASE for _ in range(100)], axis=0)
 
         qpMin = P.qMax*P.qMaxBASE*P.xpMin            # min charge at pos electrode
@@ -349,17 +312,12 @@ class BatteryRNNCell(Layer):
 
 
         if self.initial_state is None:
-            # if P.qMax.shape[0]==1:
-            #     initial_state = tf.ones([batch_size] + tensor_shape.as_shape(self.state_size).as_list(), dtype=self.dtype) \
-            #         * tf.stack([tf.constant(292.1, dtype=self.dtype), tf.constant(0.0, dtype=self.dtype), tf.constant(0.0, dtype=self.dtype), tf.constant(0.0, dtype=self.dtype), qnBMax[0], qnSMax[0], qpBMin[0], qpSMin[0]])  # 292.1 K, about 18.95 C
-            # else:
             initial_state_0_3 = tf.ones([P.qMax.shape[0], 4], dtype=self.dtype) \
                 * tf.constant([292.1, 0.0, 0.0, 0.0], dtype=self.dtype)
             initial_state = tf.concat([initial_state_0_3, tf.expand_dims(qnBMax, axis=1), tf.expand_dims(qnSMax, axis=1), tf.expand_dims(qpBMin, axis=1), tf.expand_dims(qpSMin, axis=1)], axis=1)
         else:
             initial_state = ops.convert_to_tensor(self.initial_state, dtype=self.dtype)
 
-        # tf.print('Initial state:', initial_state[:,4:])
         return initial_state
 
 if __name__ == "__main__":
