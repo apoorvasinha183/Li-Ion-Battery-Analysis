@@ -157,7 +157,7 @@ class BatteryRNNCell(Layer):
         An0 = parameters.An0 * parameters.BASE_An0
 
         return tf.stack([Ap0,Ap1,Ap2,Ap3,Ap4,Ap5,Ap6,Ap7,Ap8,Ap9,Ap10,Ap11,Ap12,An0])
-
+    
 
     def Vi(self, A, x, i):
 
@@ -451,45 +451,16 @@ if __name__ == "__main__":
     cell = BatteryRNNCell(dtype=DTYPE)
     rnn = tf.keras.layers.RNN(cell, return_sequences=False, stateful=False, batch_input_shape=inputs.shape, return_state=False, dtype=DTYPE)
 
-    # stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    # logdir = 'logs/func/%s' % stamp
-    # writer = tf.summary.create_file_writer(logdir)
-    # tf.summary.trace_on(graph=True, profiler=True)
 
     outputs = []
     H = []
     grads = []
 
-    # tf.debugging.enable_check_numerics()
-
-    # test cell output and gradient calc
-    # with tf.GradientTape(persistent=True) as t:
     with tf.GradientTape() as t:
         out = rnn(inputs)
 
-        # for i in range(500):
-        #     if i==0:
-        #         out, states = cell(inputs[:,0, :], [cell.get_initial_state(batch_size=inputs.shape[0])])
-        #     else:
-        #         out, states = cell(inputs[:,i, :], states)
-
-        #     with t.stop_recording():
-        #         o = out.numpy()
-        #         s = states[0].numpy()
-        #         g = t.gradient(out, cell.Ap0).numpy()
-        #         outputs.append(o)
-        #         H.append(s)
-        #         grads.append(g)
-        #         print("t:{}, V:{}, dV_dAp0:{}".format(i, o, g))
-        #         print("states:{}".format(s))
+    
 
     print(out)
     print(t.gradient(out, cell.Ap0))
 
-    # output = rnn(inputs)
-
-    # with writer.as_default():
-    #     tf.summary.trace_export(
-    #         name="my_func_trace",
-    #         step=0,
-    #         profiler_outdir=logdir)
