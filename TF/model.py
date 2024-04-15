@@ -9,7 +9,7 @@ DTYPE = 'float64'
 from BatteryRNNCell import BatteryRNNCell
 from BatteryRNNCell_mlp import BatteryRNNCell as BatteryRNNCellMLP
 
-def get_model(batch_input_shape=None, return_sequences=True, stateful=False, dtype=DTYPE, dt=1.0, mlp=False, mlp_trainable=True, share_q_r=True, q_max_base=None, R_0_base=None, D_trainable=False):
+def get_model(batch_input_shape=None, return_sequences=True, stateful=False, dtype=DTYPE, dt=1.0, mlp=True, mlp_trainable=True, share_q_r=True, q_max_base=None, R_0_base=None, D_trainable=False):
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.InputLayer(batch_input_shape=batch_input_shape))
     if mlp:
@@ -28,8 +28,8 @@ if __name__ == "__main__":
     inputs = np.ones((700,1000), dtype=DTYPE) * np.linspace(1.0,2.0,1000)  # constant load
     inputs = inputs.T[:,:,np.newaxis]
 
-    #model = get_model(batch_input_shape=inputs.shape, dt=10.0, mlp=True)
-    model = get_model(batch_input_shape=inputs.shape, dt=10.0, mlp=False)
+    model = get_model(batch_input_shape=inputs.shape, dt=10.0, mlp=True)
+    #model = get_model(batch_input_shape=inputs.shape, dt=10.0, mlp=False)
     model.summary()
 
     start = time()

@@ -67,16 +67,16 @@ BATCH_SIZE = inputs.shape[0]
 
 
 # # generate artificial data
-BATCH_SIZE = 36
-dt = 10.0
-time_window_size = 700
-inputs = np.ones((time_window_size,BATCH_SIZE), dtype=DTYPE) * np.linspace(1.0,2.0,BATCH_SIZE)  # uniform constant load
-inputs = inputs.T[:,:,np.newaxis]
-model = get_model(batch_input_shape=inputs.shape, dt=dt)
-model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
-target = model.predict(inputs)
+#BATCH_SIZE = 36
+#dt = 10.0
+#time_window_size = 700
+#inputs = np.ones((time_window_size,BATCH_SIZE), dtype=DTYPE) * np.linspace(1.0,2.0,BATCH_SIZE)  # uniform constant load
+#inputs = inputs.T[:,:,np.newaxis]
+#model = get_model(batch_input_shape=inputs.shape, dt=dt)
+#model.compile(optimizer="Adam", loss="mse", metrics=["mae"])
+#target = model.predict(inputs)
 
-
+print("Success!")
 # move timesteps with earlier EOD
 EOD = 3.2
 V_0 = 4.19135029  # V adding when I=0 for the shift

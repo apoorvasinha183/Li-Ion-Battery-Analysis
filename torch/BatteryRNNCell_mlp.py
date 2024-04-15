@@ -160,6 +160,8 @@ class BatteryRNNCell(Layer):
         inputs = ops.convert_to_tensor(inputs, dtype=self.dtype)
         states = ops.convert_to_tensor(states, dtype=self.dtype)
         states = states[0,:]
+        if states is None:
+            print("Here")
 
         next_states = self.getNextState(states,inputs,training)
 

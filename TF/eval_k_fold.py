@@ -107,6 +107,7 @@ for kfold in range(K_FOLDS):
 
     model_eval = get_model(batch_input_shape=(1,time_window_size-SIMULATION_OVER_STEPS,1), dt=dt, mlp=True, share_q_r=False)
     model_eval.compile(optimizer='adam', loss="mse", metrics=["mae"])
+    print("shape is ",inputs.shape)
     model = get_model(batch_input_shape=inputs.shape, dt=dt, mlp=True, share_q_r=False)
     model.compile(optimizer='adam', loss="mse", metrics=["mae"])
 
