@@ -3,7 +3,8 @@ import torch.nn as nn
 import numpy as np
 
 class BatteryRNNCell(nn.Module):
-    """This defines the RNN Block for the Battery Cell. This is very primitive as in it only performs 
+    """
+    This defines the RNN Block for the Battery Cell. This is very primitive as in it only performs 
     """
     def __init__(self, initial_state=None, dt=1.0, qMobile=7600,state_size=8,dtype=torch.float32, **kwargs):
         super(BatteryRNNCell, self).__init__()
@@ -17,6 +18,7 @@ class BatteryRNNCell(nn.Module):
 
         self.state_size = state_size
         self.output_size = 1
+
     def build(self, input_shape, **kwargs): # TODO :Why?! What does this do 
         self.built = True
 
@@ -139,9 +141,8 @@ class BatteryRNNCell(nn.Module):
 
     def forward(self, inputs, states):
         inputs = inputs.to(self.Ap0.device)
-        print("States shape is ",states)
-        states = states[0,:]
-
+        states = states[0]
+        
         next_states = self.getNextState(states, inputs)
         output = self.getNextOutput(next_states, inputs)
 
@@ -216,6 +217,10 @@ class BatteryRNNCell(nn.Module):
         #   No copyright is claimed in the United States under Title 17, U.S.
         #   Code. All Other Rights Reserved.
         """
+
+        X = X.unsqueeze(0)
+
+
         # Extract states
         Tb = X[:,0]
         Vo = X[:,1]
@@ -288,7 +293,10 @@ class BatteryRNNCell(nn.Module):
         """
         """
         This is the Euler integrator. @Antonio : You can think about replacing this with RK4."""
-        # Extract states
+        # Extract states  
+        X = X.unsqueeze(0)
+        
+
         Tb = X[:,0]
         Vo = X[:,1]
         Vsn = X[:,2]
@@ -297,6 +305,7 @@ class BatteryRNNCell(nn.Module):
         qnS = X[:,5]
         qpB = X[:,6]
         qpS = X[:,7]
+
 
         # Extract inputs
         i= U[:,0]
@@ -328,6 +337,11 @@ class BatteryRNNCell(nn.Module):
 
         dt = self.dt
         # Update state (Euler Integrator)
+        Tbdot = Tbdot.unsqueeze(0)
+        qnBdot = qnBdot.unsqueeze(0)
+        qpBdot = qpBdot.unsqueeze(0)
+
+
         XNew = torch.stack([
             Tb + Tbdot*dt,
             Vo + Vodot*dt,
@@ -338,6 +352,10 @@ class BatteryRNNCell(nn.Module):
             qpB + qpBdot*dt,
             qpS + qpSdot*dt
         ], axis = 1)
+
+
+        XNew = XNew.squeeze(0).squeeze(1)     
+
 
         return XNew
     def get_initial_state(self, inputs=None, batch_size=None):
@@ -358,4 +376,28 @@ class BatteryRNNCell(nn.Module):
 
 
 if __name__ == "__main__":
-    #What do ?!
+    # Define the input data like in the other test
+    inputs = torch.ones((1, 3100, 1), dtype=torch.float32) * 8.0  
+
+    cell = BatteryRNNCell(dtype=torch.float32)
+
+    
+    outputs = []
+    with torch.no_grad():
+        state = cell.get_initial_state(batch_size=inputs.size(0))
+        for i in range(inputs.size(1)):
+            output, state = cell(inputs[:, i:i+1, :], state)
+            outputs.append(output)
+
+    outputs = torch.stack(outputs, dim=1)
+    
+    # this is needed for some reason
+    outputs.requires_grad_(True)
+
+    # defined a stupid loss
+    loss = torch.mean(outputs) 
+    loss.backward()
+    grads = cell.Ap12.grad
+
+    print(f"Outputs: {outputs}")
+    print(f"Ap0 gradient:{grads}")
