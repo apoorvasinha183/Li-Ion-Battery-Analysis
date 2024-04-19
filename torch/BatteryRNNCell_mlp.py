@@ -140,11 +140,13 @@ class BatteryRNNCell(nn.Module):
         i = U
         print("Input density to Neural net has shape ",qpS.shape)
         qSMax = (self.qMax * self.qMaxBASE) * self.VolS / self.Vol
+        print("qSMax has shape ",qSMax.shape)
         Tbm = Tb - 273.15
-        xpS = qpS / qSMax
-        xnS = qnS / qSMax
+        xpS = qpS / torch.unsqueeze(qSMax,1)
+        xnS = qnS / torch.unsqueeze(qSMax,1)
         print(type(xpS))
         xpS = xpS.to(torch.float32)
+        xnS = xnS.to(torch.float32)
         print("Input to Neural net has shape ",xpS.shape)
         VepMLP = self.MLPp(xpS)
         VenMLP = self.MLPn(xnS)
@@ -289,5 +291,5 @@ class BatteryRNN(nn.Module):
         for input in inputs:
             output, state = self.cell(input, state)
             outputs.append(output)
-
-        return torch.stack(outputs), state    
+        #print("shape of outputs ",np.shape(outputs))
+        return torch.Tensor(outputs)

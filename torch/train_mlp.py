@@ -101,7 +101,7 @@ for epoch in range(num_epochs):
 
         # Forward pass
         outputs = mlp(inputs)
-
+        print("outputs has shape ",outputs.shape)
         # Compute loss
         loss = criterion(outputs, targets)
 
