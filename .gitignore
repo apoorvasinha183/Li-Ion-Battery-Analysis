@@ -5,7 +5,7 @@ __pycache__/
 
 # data
 *.npy
-
+.DS_Store
 # C extensions
 *.so
 
