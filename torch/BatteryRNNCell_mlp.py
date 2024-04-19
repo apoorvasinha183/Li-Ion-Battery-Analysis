@@ -38,8 +38,8 @@ class BatteryRNNCell(nn.Module):
         # Load the weights from the .pth file
         weights_path = 'torch_train/mlp_initial_weights.pth'
         mlp_p_weights = torch.load(weights_path)
-        for keys in mlp_p_weights["model_state_dict"]:
-            print("keys available are ",keys)
+        #for keys in mlp_p_weights["model_state_dict"]:
+        #    print("keys available are ",keys)
         #self.MLPp.load_state_dict(mlp_p_weights['model_state_dict'])
         #self.MLPp.train()
         with torch.no_grad():
@@ -50,7 +50,7 @@ class BatteryRNNCell(nn.Module):
             self.MLPp[3].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.bias'])
             self.MLPp[5].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.weight'])
             self.MLPp[5].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.bias'])
-        print("Success!")
+        #print("Success!")
         # Initialize MLPn weights
         X = torch.linspace(0.0, 1.0, 100).unsqueeze(1)
         Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1)
@@ -129,25 +129,25 @@ class BatteryRNNCell(nn.Module):
     def forward(self, inputs, states=None):
         if states is None:
             states = self.get_initial_state(batch_size=inputs.shape[0])
-        print("states have ")
+        #print("states have ")
         next_states = self.getNextState(states, inputs)
         output = self.getNextOutput(next_states, inputs)
         return output, next_states
 
     def getNextOutput(self, X, U):
-        print("X has shape ",X.shape)
+        ##print("X has shape ",X.shape)
         Tb, Vo, Vsn, Vsp, qnB, qnS, qpB, qpS = X.split(1, dim=1)
         i = U
-        print("Input density to Neural net has shape ",qpS.shape)
+        ##print("Input density to Neural net has shape ",qpS.shape)
         qSMax = (self.qMax * self.qMaxBASE) * self.VolS / self.Vol
-        print("qSMax has shape ",qSMax.shape)
+        ##print("qSMax has shape ",qSMax.shape)
         Tbm = Tb - 273.15
         xpS = qpS / torch.unsqueeze(qSMax,1)
         xnS = qnS / torch.unsqueeze(qSMax,1)
-        print(type(xpS))
+        ##print(type(xpS))
         xpS = xpS.to(torch.float32)
         xnS = xnS.to(torch.float32)
-        print("Input to Neural net has shape ",xpS.shape)
+        ##print("Input to Neural net has shape ",xpS.shape)
         VepMLP = self.MLPp(xpS)
         VenMLP = self.MLPn(xnS)
 
@@ -162,9 +162,9 @@ class BatteryRNNCell(nn.Module):
 
     def getNextState(self, X, U):
         Tb, Vo, Vsn, Vsp, qnB, qnS, qpB, qpS = X.split(1, dim=1)
-        i = U
-        print("X input state has shape ",X.shape)
-        print("Input current has shape ",i.shape)
+        i = U.clone()
+        ##print("X input state has shape ",X.shape)
+        ##print("Input current has shape ",i.shape)
         #Annoying
         Tb = torch.squeeze(Tb, dim=1)
         Vo = torch.squeeze(Vo, dim=1)
@@ -174,6 +174,7 @@ class BatteryRNNCell(nn.Module):
         qnS = torch.squeeze(qnS, dim=1)
         qpB = torch.squeeze(qpB, dim=1)
         qpS = torch.squeeze(qpS, dim=1)
+        i = torch.squeeze(i,dim=1)
         qSMax = (self.qMax * self.qMaxBASE) * self.VolS / self.Vol
         xpS = torch.clamp(qpS / qSMax, 1e-18, 1.0)
         xnS = torch.clamp(qnS / qSMax, 1e-18, 1.0)
@@ -199,13 +200,13 @@ class BatteryRNNCell(nn.Module):
         VspNominal = self.R * Tb / self.F / self.alpha * torch.asinh(Jp / (2 * Jp0))
         Vsndot = (VsnNominal - Vsn) / self.tsn
         Vspdot = (VspNominal - Vsp) / self.tsp
-        DEBUG = True
-        if DEBUG:
-            print("Vo has shape ",Vo.shape)
-            print("Vnominal has shape ",VoNominal.shape)
-            print("Derivative shape Tb ",Tbdot.shape)
-            print("Derivative shape Vo  ",Vodot.shape)
-            print("Derivative shape Vsp  ",Vspdot.shape)
+        DEBUG = False
+        #if DEBUG:
+            #print("Vo has shape ",Vo.shape)
+            #print("Vnominal has shape ",VoNominal.shape)
+            #print("Derivative shape Tb ",Tbdot.shape)
+            #print("Derivative shape Vo  ",Vodot.shape)
+            #print("Derivative shape Vsp  ",Vspdot.shape)
         #Maturity is realising braodcasting hurts
         
         
@@ -232,7 +233,7 @@ class BatteryRNNCell(nn.Module):
             qpS_new.unsqueeze(1)
         ], dim=1)
        
-        print("Update state has size ",XNew.shape)
+        ##print("Update state has size ",XNew.shape)
         return XNew
 
     def get_initial_state(self, batch_size=None):
@@ -262,7 +263,7 @@ class BatteryRNNCell(nn.Module):
             ], dim=1)
         else:
             initial_state = torch.tensor(self.initial_state)
-        print("initial state has size ",initial_state.shape)
+        ##print("initial state has size ",initial_state.shape)
         return initial_state
 #This is the true RNN cell
 class BatteryRNN(nn.Module):
@@ -285,11 +286,19 @@ class BatteryRNN(nn.Module):
         outputs = []
         if initial_state is None:
             state = self.cell.get_initial_state(batch_size=self.batch_size)
-        print("input has size ",inputs.shape)
-        inputs = inputs[0]
-        print("input state has size ",state.shape)
-        for input in inputs:
+        #print("input has size ",inputs.shape)
+        #inputs = inputs[0]
+        seq_length = inputs.shape[1]
+        #print("sequence length is ",seq_length)
+        #print("input state has size ",state.shape)
+        outputs = torch.zeros((self.batch_size,seq_length))
+        #print("outputs tensor shape is ",outputs.shape)
+        for t in range(seq_length):
+            input = inputs[:,t,:]
+            #print("Input to BIG has shape ",input.shape)
             output, state = self.cell(input, state)
-            outputs.append(output)
-        #print("shape of outputs ",np.shape(outputs))
-        return torch.Tensor(outputs)
+            #print("single step out shape ",output.shape)
+            outputs[:,t] = output.squeeze(1)
+        ##print("This output is ",torch.shape(outputs))
+        ##print("shape of outputs ",np.shape(outputs))
+        return outputs

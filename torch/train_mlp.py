@@ -101,10 +101,14 @@ for epoch in range(num_epochs):
 
         # Forward pass
         outputs = mlp(inputs)
-        print("outputs has shape ",outputs.shape)
+        #print("outputs has shape ",np.shape(outputs))
         # Compute loss
-        loss = criterion(outputs, targets)
-
+        targets = targets[:,:,0]
+        #print("targets has shape ",targets.shape)
+        loss = criterion(outputs, targets.float())
+        #print(loss)
+        #print("loss shape is ",loss.shape)
+        loss = loss.float()
         # Backpropagation
         loss.backward()
         optimizer.step()
