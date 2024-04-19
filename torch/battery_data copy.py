@@ -1,13 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
-"""
-This file extracts the data from the NASA files . If you are having errors either:
-1. You do not have the files in the correct folder format. Check the BATTERY_FILES variable.
-2. You do not have the files.
-The best way to deal with this is to run data_retrieval.py .It will take care of everything for you.
-
-This file borrows code from the original TF translation of the author's codes."""
+#This one extracts the datasets for one set.
+#DATA_PATH = '../data/'
+#TODO: DATA_PATH needs to be consistently defined.
 DATA_PATH = '../data/'
 BATTERY_FILES = {
     1: 'Battery_Uniform_Distribution_Variable_Charge_Room_Temp_DataSet_2Post/data/Matlab/RW{}.mat',
@@ -69,7 +65,7 @@ def getDischargeMultipleBatteries(data_path=BATTERY_FILES, varnames=['voltage', 
     return data_dic
 
 if __name__ == "__main__":
-    """DATA VISUALIZATION """
+    
     data_RW = getDischargeMultipleBatteries()
 
     max_idx_to_plot = 1
@@ -98,7 +94,7 @@ if __name__ == "__main__":
 
     plt.xlabel('Time (s)')
     # Save figure for the jupyter notebook folks
-    plt.savefig("../Results/Torch/Illustration/I-VCharacteristics.png")
+    plt.savefig("TF/figures/I-VCharacteristics.png")
     plt.show()
     
 

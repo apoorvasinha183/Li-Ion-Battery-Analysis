@@ -1,409 +1,227 @@
-from tensorflow.python.framework import ops, tensor_shape
-from tensorflow.python.keras.engine.base_layer import Layer
-from tensorflow.python.ops import array_ops, math_ops
-from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense
-
-from datetime import datetime
-
-import tensorflow as tf
-
-DTYPE = 'float32'
-tf.keras.backend.set_floatx(DTYPE)
-
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
-import matplotlib.pyplot as plt
 
-import tensorflow_probability as tfp
-tfd = tfp.distributions
-
-class BatteryRNNCell(Layer):
-    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, batch_size=1, q_max_base=None, R_0_base=None, D_trainable=False, **kwargs):
-        super(BatteryRNNCell, self).__init__(**kwargs)
+class BatteryRNNCell(nn.Module):
+    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, batch_size=1, q_max_base=None, R_0_base=None, D_trainable=False):
+        super(BatteryRNNCell, self).__init__()
 
         self.initial_state = initial_state
         self.dt = dt
         self.qMobile = qMobile
         self.q_max_base_value = q_max_base
         self.R_0_base_value = R_0_base
+        self.curr_cum_pwh = curr_cum_pwh
 
         self.q_max_model = q_max_model
         self.R_0_model = R_0_model
-        self.curr_cum_pwh = curr_cum_pwh
 
-        self.initBatteryParams(batch_size, D_trainable)
-
-        self.state_size  = tensor_shape.TensorShape(8)
-        self.output_size = tensor_shape.TensorShape(1)
+        self.state_size = 8
+        self.output_size = 1
         
-        self.MLPp = Sequential([
-            
-            Dense(8, activation='tanh', input_shape=(1,), dtype=self.dtype),
-            Dense(4, activation='tanh', dtype=self.dtype),
-            Dense(1, dtype=self.dtype),
-        ], name="MLPp")
+        self.MLPp = nn.Sequential(
+            nn.Linear(1, 8),
+            nn.Tanh(),
+            nn.Linear(8, 4),
+            nn.Tanh(),
+            nn.Linear(4, 1)
+        )
 
-        X = np.linspace(0.0,1.0,100)
+        self.MLPn = nn.Sequential(
+            nn.Linear(1, 1)
+        )
 
-        
-        self.MLPp.set_weights(np.load('../training/mlp_initial_weight_with-I.npy',allow_pickle=True))
+        # Initialize MLPp weights
+        # Load the weights from the .pth file
+        weights_path = 'mlp_initial_weights.pth'
+        mlp_p_weights = torch.load(weights_path)
 
-        Y = np.linspace(-8e-4,8e-4,100)
-        self.MLPn = Sequential([Dense(1, input_shape=(1,), dtype=self.dtype)], name="MLPn")
-        self.MLPn.compile(optimizer=tf.keras.optimizers.Adam(lr=2e-2), loss="mse")
-        self.MLPn.fit(X,Y, epochs=200, verbose=0)
+        # Assuming self.MLPp is your PyTorch Sequential model
+        with torch.no_grad():
+            # Assign weights and biases to each layer in the model
+            self.MLPp[0].weight.copy_(mlp_p_weights['0.weight'])
+            self.MLPp[0].bias.copy_(mlp_p_weights['0.bias'])
+            self.MLPp[2].weight.copy_(mlp_p_weights['2.weight'])
+            self.MLPp[2].bias.copy_(mlp_p_weights['2.bias'])
+            self.MLPp[4].weight.copy_(mlp_p_weights['4.weight'])
+            self.MLPp[4].bias.copy_(mlp_p_weights['4.bias'])
 
-        for layer in self.MLPp.layers:
-            layer.trainable=mlp_trainable
+        # Initialize MLPn weights
+        X = torch.linspace(0.0, 1.0, 100).unsqueeze(1)
+        Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1)
+        self.MLPn_optim = torch.optim.Adam(self.MLPn.parameters(), lr=2e-2)
+        for _ in range(200):
+            self.MLPn_optim.zero_grad()
+            output = self.MLPn(X)
+            loss = F.mse_loss(output, Y)
+            loss.backward()
+            self.MLPn_optim.step()
 
-        for layer in self.MLPn.layers:
-            # layer.trainable=mlp_trainable
-            layer.trainable=False
+        for param in self.MLPn.parameters():
+            param.requires_grad = False
 
     def initBatteryParams(self, batch_size, D_trainable):
-        P = self
-        
-        if self.q_max_base_value is None:
-            self.q_max_base_value = 1.0e4
+        self.q_max_base_value = 1.0e4 if self.q_max_base_value is None else self.q_max_base_value
+        self.R_0_base_value = 1.0e1 if self.R_0_base_value is None else self.R_0_base_value
 
-        if self.R_0_base_value is None:
-            self.R_0_base_value = 1.0e1
+        self.xnMax = torch.tensor(0.6)
+        self.xnMin = torch.tensor(0.0)
+        self.xpMax = torch.tensor(1.0)
+        self.xpMin = torch.tensor(0.4)
 
-        max_q_max = 2.3e4 / self.q_max_base_value
-        initial_q_max = 1.4e4 / self.q_max_base_value
-
-        min_R_0 = 0.05 / self.R_0_base_value
-        initial_R_0 = 0.15 / self.R_0_base_value
-
-        P.xnMax = tf.constant(0.6, dtype=self.dtype)             # maximum mole fraction (neg electrode)
-        P.xnMin = tf.constant(0, dtype=self.dtype)              # minimum mole fraction (neg electrode)
-        P.xpMax = tf.constant(1.0, dtype=self.dtype)            # maximum mole fraction (pos electrode)
-        P.xpMin = tf.constant(0.4, dtype=self.dtype)            # minimum mole fraction (pos electrode) -> note xn+xp=1
-
-        constraint = lambda w: w * math_ops.cast(math_ops.greater(w, 0.), self.dtype)  # contraint > 0
-       
-        constraint_q_max = lambda w: tf.clip_by_value(w, 0.0, max_q_max)
-        constraint_R_0 = lambda w: tf.clip_by_value(w, min_R_0, 1.0)
-     
-        P.qMaxBASE = tf.constant(self.q_max_base_value, dtype=self.dtype)
-        P.RoBASE = tf.constant(self.R_0_base_value, dtype=self.dtype)
-      
-
+        self.qMaxBASE = torch.tensor(self.q_max_base_value)
+        self.RoBASE = torch.tensor(self.R_0_base_value)
 
         if self.q_max_model is None:
-            P.qMax = tf.Variable(np.ones(batch_size)*initial_q_max, constraint=constraint_q_max, dtype=self.dtype)  # init 0.1 - resp 0.1266
+            initial_q_max = torch.tensor(1.4e4 / self.q_max_base_value)
+            self.qMax = nn.Parameter(initial_q_max * torch.ones(batch_size))
         else:
-            P.qMax = self.q_max_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.qMaxBASE
+            self.qMax = self.q_max_model(torch.tensor([[self.curr_cum_pwh]]))[:, 0, 0] / self.qMaxBASE
 
         if self.R_0_model is None:
-            P.Ro = tf.Variable(np.ones(batch_size)*initial_R_0, constraint=constraint, dtype=self.dtype)   # init 0.15 - resp 0.117215
-        else:    
-            P.Ro = self.R_0_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.RoBASE
+            initial_R_0 = torch.tensor(0.15 / self.R_0_base_value)
+            self.Ro = nn.Parameter(initial_R_0 * torch.ones(batch_size))
+        else:
+            self.Ro = self.R_0_model(torch.tensor([[self.curr_cum_pwh]]))[:, 0, 0] / self.RoBASE
 
-        # Constants of nature
-        P.R = tf.constant(8.3144621, dtype=self.dtype)          # universal gas constant, J/K/mol
-        P.F = tf.constant(96487, dtype=self.dtype)              # Faraday's constant, C/mol
+        self.R = torch.tensor(8.3144621)
+        self.F = torch.tensor(96487)
+        self.alpha = torch.tensor(0.5)
+        self.VolSFraction = torch.tensor(0.1)
+        self.Sn = torch.tensor(2e-4)
+        self.Sp = torch.tensor(2e-4)
+        self.kn = torch.tensor(2e4)
+        self.kp = torch.tensor(2e4)
+        self.Vol = torch.tensor(2.2e-5)
 
-        # Li-ion parameters
-        P.alpha = tf.constant(0.5, dtype=self.dtype)            # anodic/cathodic electrochemical transfer coefficient
-    
-        P.VolSFraction = tf.constant(0.1, dtype=self.dtype)     # fraction of total volume occupied by surface volume
+        self.VolS = self.VolSFraction * self.Vol
+        self.VolB = self.Vol - self.VolS
 
-        P.Sn = tf.constant(2e-4, dtype=self.dtype)       # surface area (- electrode)
-        P.Sp = tf.constant(2e-4, dtype=self.dtype)        # surface area (+ electrode)
-        P.kn = tf.constant(2e4, dtype=self.dtype)           # lumped constant for BV (- electrode)
-        P.kp = tf.constant(2e4, dtype=self.dtype)            # lumped constant for BV (+ electrode)
-        P.Vol = tf.constant(2.2e-5, dtype=self.dtype)    
+        self.qpMin = self.qMax * self.qMaxBASE * self.xpMin
+        self.qpMax = self.qMax * self.qMaxBASE * self.xpMax
+        self.qpSMin = self.qpMin * self.VolS / self.Vol
+        self.qpBMin = self.qpMin * self.VolB / self.Vol
+        self.qpSMax = self.qpMax * self.VolS / self.Vol
+        self.qpBMax = self.qpMax * self.VolB / self.Vol
+        self.qnMin = self.qMax * self.qMaxBASE * self.xnMin
+        self.qnMax = self.qMax * self.qMaxBASE * self.xnMax
+        self.qnSMax = self.qnMax * self.VolS / self.Vol
+        self.qnBMax = self.qnMax * self.VolB / self.Vol
+        self.qnSMin = self.qnMin * self.VolS / self.Vol
+        self.qnBMin = self.qnMin * self.VolB / self.Vol
+        self.qSMax = self.qMax * self.qMaxBASE * self.VolS / self.Vol
+        self.qBMax = self.qMax * self.qMaxBASE * self.VolB / self.Vol
 
+        self.to = torch.tensor(10.0)
+        self.tsn = torch.tensor(90.0)
+        self.tsp = torch.tensor(90.0)
+        self.U0p = torch.tensor(4.03)
+        self.U0n = torch.tensor(0.01)
+        self.VEOD = torch.tensor(3.0)
 
-        P.VolS = P.VolSFraction*P.Vol  # surface volume
-        P.VolB = P.Vol - P.VolS        # bulk volume
-
-        # set up charges (Li ions)
-        P.qpMin = P.qMax*P.qMaxBASE*P.xpMin            # min charge at pos electrode
-        P.qpMax = P.qMax*P.qMaxBASE*P.xpMax            # max charge at pos electrode
-        P.qpSMin = P.qpMin*P.VolS/P.Vol     # min charge at surface, pos electrode
-        P.qpBMin = P.qpMin*P.VolB/P.Vol     # min charge at bulk, pos electrode
-        P.qpSMax = P.qpMax*P.VolS/P.Vol     # max charge at surface, pos electrode
-        P.qpBMax = P.qpMax*P.VolB/P.Vol     # max charge at bulk, pos electrode
-        P.qnMin = P.qMax*P.qMaxBASE*P.xnMin            # max charge at neg electrode
-        P.qnMax = P.qMax*P.qMaxBASE*P.xnMax            # max charge at neg electrode
-        P.qnSMax = P.qnMax*P.VolS/P.Vol     # max charge at surface, neg electrode
-        P.qnBMax = P.qnMax*P.VolB/P.Vol     # max charge at bulk, neg electrode
-        P.qnSMin = P.qnMin*P.VolS/P.Vol     # min charge at surface, neg electrode
-        P.qnBMin = P.qnMin*P.VolB/P.Vol     # min charge at bulk, neg electrode
-        P.qSMax = P.qMax*P.qMaxBASE*P.VolS/P.Vol       # max charge at surface (pos and neg)
-        P.qBMax = P.qMax*P.qMaxBASE*P.VolB/P.Vol       # max charge at bulk (pos and neg)
-
-        
-       
-
-        P.to = tf.constant(10.0, dtype=self.dtype)      # for Ohmic voltage
-        P.tsn = tf.constant(90.0, dtype=self.dtype)     # for surface overpotential (neg)
-        P.tsp = tf.constant(90.0, dtype=self.dtype)     # for surface overpotential (pos)
-
-        # Redlich-Kister parameters (positive electrode)
-        P.U0p = tf.constant(4.03, dtype=self.dtype)
-        # P.U0p = tf.Variable(4.03, dtype=self.dtype)
-
-        # Redlich-Kister parameters (negative electrode)
-        P.U0n = tf.constant(0.01, dtype=self.dtype)
-
-        # End of discharge voltage threshold
-        P.VEOD = tf.constant(3.0, dtype=self.dtype)
-
-    def build(self, input_shape, **kwargs):
-        self.built = True
-
-    @tf.function
-    def call(self, inputs, states, training=None):
-        inputs = ops.convert_to_tensor(inputs, dtype=self.dtype)
-        states = ops.convert_to_tensor(states, dtype=self.dtype)
-        states = states[0,:]
+    def forward(self, inputs, states=None):
         if states is None:
-            print("Here")
+            states = self.get_initial_state(batch_size=inputs.shape[0])
 
-        next_states = self.getNextState(states,inputs,training)
+        next_states = self.getNextState(states, inputs)
+        output = self.getNextOutput(next_states, inputs)
+        return output, next_states
 
-        output = self.getNextOutput(next_states,inputs,training)
+    def getNextOutput(self, X, U):
+        Tb, Vo, Vsn, Vsp, qnB, qnS, qpB, qpS = X.split(1, dim=1)
+        i = U
 
-        return output, [next_states]
+        qSMax = (self.qMax * self.qMaxBASE) * self.VolS / self.Vol
+        Tbm = Tb - 273.15
+        xpS = qpS / qSMax
+        xnS = qnS / qSMax
 
-    def getAparams(self):
-        return self.MLPp.get_weights()
+        VepMLP = self.MLPp(xpS)
+        VenMLP = self.MLPn(xnS)
 
-   
-    def getNextOutput(self,X,U,training):
-        # OutputEqn   Compute the outputs of the battery model
-        #
-        #   Z = OutputEqn(parameters,t,X,U,N) computes the outputs of the battery
-        #   model given the parameters structure, time, the states, inputs, and
-        #   sensor noise. The function is vectorized, so if the function inputs are
-        #   matrices, the funciton output will be a matrix, with the rows being the
-        #   variables and the columns the samples.
-        #
-        #   Copyright (c)�2016 United States Government as represented by the
-        #   Administrator of the National Aeronautics and Space Administration.
-        #   No copyright is claimed in the United States under Title 17, U.S.
-        #   Code. All Other Rights Reserved.
+        safe_log_p = torch.clamp((1 - xpS) / xpS, 1e-18, 1e+18)
+        safe_log_n = torch.clamp((1 - xnS) / xnS, 1e-18, 1e+18)
 
-        # Extract states
-        Tb = X[:,0]
-        Vo = X[:,1]
-        Vsn = X[:,2]
-        Vsp = X[:,3]
-        qnB = X[:,4]
-        qnS = X[:,5]
-        qpB = X[:,6]
-        qpS = X[:,7]
-
-       
-        i = U[:,0]
-
-        parameters = self
-
-        qSMax = (parameters.qMax * parameters.qMaxBASE) * parameters.VolS/parameters.Vol
-
-        
-        Tbm = Tb-273.15
-        xpS = qpS/qSMax
-        xnS = qnS/qSMax
-
-        VepMLP = self.MLPp(tf.expand_dims(xpS,1))[:,0]
-        VenMLP = self.MLPn(tf.expand_dims(xnS,1))[:,0]
-
-       
-        safe_log_p = tf.clip_by_value((1-xpS)/xpS,1e-18,1e+18)
-        safe_log_n = tf.clip_by_value((1-xnS)/xnS,1e-18,1e+18)
-       
-        Vep = parameters.U0p + parameters.R*Tb/parameters.F*tf.math.log(safe_log_p) + VepMLP
-        Ven = parameters.U0n + parameters.R*Tb/parameters.F*tf.math.log(safe_log_n) + VenMLP
+        Vep = self.U0p + self.R * Tb / self.F * torch.log(safe_log_p) + VepMLP
+        Ven = self.U0n + self.R * Tb / self.F * torch.log(safe_log_n) + VenMLP
         V = Vep - Ven - Vo - Vsn - Vsp
 
-        return tf.expand_dims(V,1, name="output")
+        return V
 
-    
-    def getNextState(self,X,U,training):
-        # StateEqn   Compute the new states of the battery model
-        #
-        #   XNew = StateEqn(parameters,t,X,U,N,dt) computes the new states of the
-        #   battery model given the parameters strcucture, the current time, the
-        #   current states, inputs, process noise, and the sampling time.
-        #
-        #   Copyright (c)�2016 United States Government as represented by the
-        #   Administrator of the National Aeronautics and Space Administration.
-        #   No copyright is claimed in the United States under Title 17, U.S.
-        #   Code. All Other Rights Reserved.
+    def getNextState(self, X, U):
+        Tb, Vo, Vsn, Vsp, qnB, qnS, qpB, qpS = X.split(1, dim=1)
+        i = U
 
-        # Extract states
-        Tb = X[:,0]
-        Vo = X[:,1]
-        Vsn = X[:,2]
-        Vsp = X[:,3]
-        qnB = X[:,4]
-        qnS = X[:,5]
-        qpB = X[:,6]
-        qpS = X[:,7]
+        qSMax = (self.qMax * self.qMaxBASE) * self.VolS / self.Vol
+        xpS = torch.clamp(qpS / qSMax, 1e-18, 1.0)
+        xnS = torch.clamp(qnS / qSMax, 1e-18, 1.0)
+        Jn0 = 1e-18 + self.kn * (1 - xnS) ** self.alpha * (xnS) ** self.alpha
+        Jp0 = 1e-18 + self.kp * (1 - xpS) ** self.alpha * (xpS) ** self.alpha
 
-        # Extract inputs
-        # P = U[:,0]
-        i = U[:,0]
-
-        parameters = self
-
-        qSMax = (parameters.qMax * parameters.qMaxBASE) * parameters.VolS/parameters.Vol
-
-        xpS = tf.clip_by_value(qpS/qSMax,1e-18,1.0)
-        xnS = tf.clip_by_value(qnS/qSMax,1e-18,1.0)
-        Jn0 = 1e-18 + parameters.kn*(1-xnS)**parameters.alpha*(xnS)**parameters.alpha
-        Jp0 = 1e-18 + parameters.kp*(1-xpS)**parameters.alpha*(xpS)**parameters.alpha
-        
-        Tbdot = tf.zeros(X.shape[0], dtype=self.dtype)
-        CnBulk = qnB/parameters.VolB
-        CnSurface = qnS/parameters.VolS
-        CpSurface = qpS/parameters.VolS
-        CpBulk = qpB/parameters.VolB
-        qdotDiffusionBSn = (CnBulk-CnSurface)/parameters.tDiffusion
-        qnBdot = - qdotDiffusionBSn
-        qdotDiffusionBSp = (CpBulk-CpSurface)/parameters.tDiffusion
-        qpBdot = - qdotDiffusionBSp
-        # i = P/V
+        Tbdot = torch.zeros_like(Tb)
+        CnBulk = qnB / self.VolB
+        CnSurface = qnS / self.VolS
+        CpSurface = qpS / self.VolS
+        CpBulk = qpB / self.VolB
+        qdotDiffusionBSn = (CnBulk - CnSurface) / self.tDiffusion
+        qnBdot = -qdotDiffusionBSn
+        qdotDiffusionBSp = (CpBulk - CpSurface) / self.tDiffusion
+        qpBdot = -qdotDiffusionBSp
         qpSdot = i + qdotDiffusionBSp
-        Jn = i/parameters.Sn
-        VoNominal = i*parameters.Ro*parameters.RoBASE
-        Jp = i/parameters.Sp
+        Jn = i / self.Sn
+        VoNominal = i * self.Ro * self.RoBASE
+        Jp = i / self.Sp
         qnSdot = qdotDiffusionBSn - i
-        VsnNominal = parameters.R*Tb/parameters.F/parameters.alpha*tf.math.asinh(Jn/(2*Jn0))
-        Vodot = (VoNominal-Vo)/parameters.to
-        VspNominal = parameters.R*Tb/parameters.F/parameters.alpha*tf.math.asinh(Jp/(2*Jp0))
-        Vsndot = (VsnNominal-Vsn)/parameters.tsn
-        Vspdot = (VspNominal-Vsp)/parameters.tsp
+        VsnNominal = self.R * Tb / self.F / self.alpha * torch.asinh(Jn / (2 * Jn0))
+        Vodot = (VoNominal - Vo) / self.to
+        VspNominal = self.R * Tb / self.F / self.alpha * torch.asinh(Jp / (2 * Jp0))
+        Vsndot = (VsnNominal - Vsn) / self.tsn
+        Vspdot = (VspNominal - Vsp) / self.tsp
 
         dt = self.dt
-        # Update state
-        XNew = tf.stack([
-            Tb + Tbdot*dt,
-            Vo + Vodot*dt,
-            Vsn + Vsndot*dt,
-            Vsp + Vspdot*dt,
-            qnB + qnBdot*dt,
-            qnS + qnSdot*dt,
-            qpB + qpBdot*dt,
-            qpS + qpSdot*dt
-        ], axis = 1, name='next_states')
+        XNew = torch.cat([
+            Tb + Tbdot * dt,
+            Vo + Vodot * dt,
+            Vsn + Vsndot * dt,
+            Vsp + Vspdot * dt,
+            qnB + qnBdot * dt,
+            qnS + qnSdot * dt,
+            qpB + qpBdot * dt,
+            qpS + qpSdot * dt
+        ], dim=1)
 
         return XNew
 
-    def get_initial_state(self, inputs=None, batch_size=None, dtype=None):
-        P = self
-
+    def get_initial_state(self, batch_size=None):
+        self.initBatteryParams(batch_size, D_trainable=False)
         if self.q_max_model is not None:
-            
-            P.qMax = tf.concat([self.q_max_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.qMaxBASE for _ in range(100)], axis=0)
+            qMax = torch.cat([self.q_max_model(torch.tensor([[self.curr_cum_pwh]]))[:, 0, 0] / self.qMaxBASE for _ in range(batch_size)], dim=0)
+        else:
+            qMax = self.qMax
 
-        if self.R_0_model is not None: 
-            
-            P.Ro = tf.concat([self.R_0_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.RoBASE for _ in range(100)], axis=0)
+        if self.R_0_model is not None:
+            Ro = torch.cat([self.R_0_model(torch.tensor([[self.curr_cum_pwh]]))[:, 0, 0] / self.RoBASE for _ in range(batch_size)], dim=0)
+        else:
+            Ro = self.Ro
 
-        qpMin = P.qMax*P.qMaxBASE*P.xpMin            # min charge at pos electrode
-        qpSMin = qpMin*P.VolS/P.Vol     # min charge at surface, pos electrode
-        qpBMin = qpMin*P.VolB/P.Vol     # min charge at bulk, pos electrode
-        qnMax = P.qMax*P.qMaxBASE*P.xnMax            # max charge at neg electrode
-        qnSMax = qnMax*P.VolS/P.Vol     # max charge at surface, neg electrode
-        qnBMax = qnMax*P.VolB/P.Vol     # max charge at bulk, neg electrode
-
+        qpMin = qMax * self.qMaxBASE * self.xpMin
+        qpSMin = qpMin * self.VolS / self.Vol
+        qpBMin = qpMin * self.VolB / self.Vol
+        qnMax = qMax * self.qMaxBASE * self.xnMax
+        qnSMax = qnMax * self.VolS / self.Vol
+        qnBMax = qnMax * self.VolB / self.Vol
 
         if self.initial_state is None:
-            initial_state_0_3 = tf.ones([P.qMax.shape[0], 4], dtype=self.dtype) \
-                * tf.constant([292.1, 0.0, 0.0, 0.0], dtype=self.dtype)
-            initial_state = tf.concat([initial_state_0_3, tf.expand_dims(qnBMax, axis=1), tf.expand_dims(qnSMax, axis=1), tf.expand_dims(qpBMin, axis=1), tf.expand_dims(qpSMin, axis=1)], axis=1)
+            initial_state = torch.cat([
+                292.1 * torch.ones(batch_size, 1),
+                torch.zeros(batch_size, 3),
+                qnBMax.view(batch_size, 1),
+                qnSMax.view(batch_size, 1),
+                qpBMin.view(batch_size, 1),
+                qpSMin.view(batch_size, 1)
+            ], dim=1)
         else:
-            initial_state = ops.convert_to_tensor(self.initial_state, dtype=self.dtype)
+            initial_state = torch.tensor(self.initial_state)
 
         return initial_state
-
-if __name__ == "__main__":
-    # Test RNN baterry cell
-
-    DTYPE = 'float32'
-    dt = 10.0
-    # inputs = np.hstack([np.zeros((1,50,1),dtype=DTYPE), np.ones((1,100,1),dtype=DTYPE)]) * 2.0  # constant load
-    # inputs = np.array([1.003, 0.999, 1.   , 1.   , 1.   , 0.999, 1.   , 1.   , 1.   ,
-    #    1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 0.999,
-    #    1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   ,
-    #    1.   , 0.999, 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   ,
-    #    1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   ,
-    #    1.   , 1.   , 1.   , 1.001, 1.001, 0.999, 1.   , 1.   , 1.   ,
-    #    1.   , 0.999, 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   ,
-    #    1.   , 1.   , 1.   , 1.001, 1.   , 1.   , 1.   , 1.   , 1.   ,
-    #    1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   ,
-    #    1.   , 0.999, 1.   , 1.   , 0.999, 1.   , 1.   , 1.   , 1.   ,
-    #    1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 1.   , 0.999, 1.   ,
-    #    1.   ])[np.newaxis, :, np.newaxis]
-    inputs = np.ones((1000,800,1))
-    # inputs = np.zeros((30,700,1),dtype=DTYPE)  # constant load
-
-    cell = BatteryRNNCell(dtype=DTYPE, dt=dt, batch_size=inputs.shape[0])
-    rnn = tf.keras.layers.RNN(cell, return_sequences=True, batch_input_shape=inputs.shape, return_state=False, dtype=DTYPE)
-
-    cell.MLPp.set_weights(np.load('./training/MLPp_best_weights.npy',allow_pickle=True))
-
-    # stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    # logdir = 'logs/func/%s' % stamp
-    # writer = tf.summary.create_file_writer(logdir)
-    # tf.summary.trace_on(graph=True, profiler=True)
-
-    outputs = []
-    H = []
-    grads = []
-
-    # tf.debugging.enable_check_numerics()
-
-    # test cell output and gradient calc
-    # with tf.GradientTape(persistent=True) as t:
-    # with tf.GradientTape() as t:
-        # out = rnn(inputs)
-
-        # for i in range(500):
-        #     if i==0:
-        #         out, states = cell(inputs[:,0, :], [cell.get_initial_state(batch_size=inputs.shape[0])])
-        #     else:
-        #         out, states = cell(inputs[:,i, :], states)
-
-        #     with t.stop_recording():
-        #         o = out.numpy()
-        #         s = states[0].numpy()
-        #         g = t.gradient(out, cell.Ap0).numpy()
-        #         outputs.append(o)
-        #         H.append(s)
-        #         grads.append(g)
-        #         print("t:{}, V:{}, dV_dAp0:{}".format(i, o, g))
-        #         print("states:{}".format(s))
-
-    # print(out)
-    # print(t.gradient(out, cell.MLPp.variables[0]))
-
-    # out, states = cell(inputs[:,0, :], [cell.get_initial_state(batch_size=inputs.shape[0])])
-
-    output = rnn(inputs)[:,:,0].numpy()
-
-    mean = np.quantile(output, 0.5, 0)
-    lb = np.quantile(output, 0.025, 0)
-    ub = np.quantile(output, 0.975, 0)
-    std = output.std(axis=0)
-
-    # plt.plot(output[:,:,0].numpy().T)
-    plt.fill_between(np.arange(inputs.shape[1]), 
-                 ub, 
-                 lb, 
-                 alpha=0.5)
-    plt.plot(mean)
-
-    plt.grid()
-    plt.show()
-
-    # with writer.as_default():
-    #     tf.summary.trace_export(
-    #         name="my_func_trace",
-    #         step=0,
-    #         profiler_outdir=logdir)
