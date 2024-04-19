@@ -85,7 +85,7 @@ Y_tensor = torch.from_numpy(Y)
 
 # Create PyTorch Dataset and DataLoader
 dataset = TensorDataset(X_tensor, Y_tensor)
-data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+data_loader = DataLoader(dataset, batch_size=30, shuffle=True)
 
 # Learning rate scheduler
 scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
