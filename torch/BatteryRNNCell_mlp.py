@@ -197,19 +197,16 @@ class BatteryRNNCell(nn.Module):
     def get_initial_state(self, batch_size=None):
         self.initBatteryParams(batch_size, D_trainable=False)
         if self.q_max_model is not None:
-            qMax = torch.cat([self.q_max_model(torch.tensor([[self.curr_cum_pwh]]))[:, 0, 0] / self.qMaxBASE for _ in range(batch_size)], dim=0)
-        else:
-            qMax = self.qMax
+            self.qMax = torch.cat([self.q_max_model(torch.tensor([[self.curr_cum_pwh]]))[:, 0, 0] / self.qMaxBASE for _ in range(batch_size)], dim=0)
+        
 
         if self.R_0_model is not None:
-            Ro = torch.cat([self.R_0_model(torch.tensor([[self.curr_cum_pwh]]))[:, 0, 0] / self.RoBASE for _ in range(batch_size)], dim=0)
-        else:
-            Ro = self.Ro
-
-        qpMin = qMax * self.qMaxBASE * self.xpMin
+            self.Ro = torch.cat([self.R_0_model(torch.tensor([[self.curr_cum_pwh]]))[:, 0, 0] / self.RoBASE for _ in range(batch_size)], dim=0)
+        
+        qpMin = self.qMax * self.qMaxBASE * self.xpMin
         qpSMin = qpMin * self.VolS / self.Vol
         qpBMin = qpMin * self.VolB / self.Vol
-        qnMax = qMax * self.qMaxBASE * self.xnMax
+        qnMax = self.qMax * self.qMaxBASE * self.xnMax
         qnSMax = qnMax * self.VolS / self.Vol
         qnBMax = qnMax * self.VolB / self.Vol
 
