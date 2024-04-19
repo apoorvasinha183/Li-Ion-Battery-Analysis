@@ -50,6 +50,7 @@ class BatteryRNNCell(nn.Module):
         # Initialize MLPn weights
         X = torch.linspace(0.0, 1.0, 100).unsqueeze(1)
         Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1)
+        #This is such a chad move
         self.MLPn_optim = torch.optim.Adam(self.MLPn.parameters(), lr=2e-2)
         for _ in range(200):
             self.MLPn_optim.zero_grad()
