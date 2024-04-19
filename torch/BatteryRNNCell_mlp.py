@@ -37,7 +37,7 @@ class BatteryRNNCell(nn.Module):
         weights_path = 'mlp_initial_weights.pth'
         mlp_p_weights = torch.load(weights_path)
 
-        # Assuming self.MLPp is your PyTorch Sequential model
+        
         with torch.no_grad():
             # Assign weights and biases to each layer in the model
             self.MLPp[0].weight.copy_(mlp_p_weights['0.weight'])
@@ -226,3 +226,30 @@ class BatteryRNNCell(nn.Module):
             initial_state = torch.tensor(self.initial_state)
 
         return initial_state
+#This is the true RNN cell
+class BatteryRNN(nn.Module):
+    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, batch_size=1, q_max_base=None, R_0_base=None, D_trainable=False):
+        super(BatteryRNN,self).__init__()
+        self.q_max_model = q_max_model
+        self.R_0_model = R_0_model
+        self.curr_cum_pwh = curr_cum_pwh
+        self.initial_state = initial_state
+        self.dt = dt
+        self.qMobile = qMobile
+        self.mlp_trainable = mlp_trainable
+        self.batch_size = batch_size
+        self.q_max_base = q_max_base
+        self.R_0_base = R_0_base
+        self.D_trainable = D_trainable
+        self.cell = BatteryRNNCell(q_max_model=self.q_max_model, R_0_model=self.R_0_model, curr_cum_pwh=self.curr_cum_pwh, initial_state=self.initial_state, dt=self.dt, qMobile=self.qMobile, mlp_trainable=self.mlp_trainable, batch_size=self.batch_size, q_max_base=self.q_max_base, R_0_base=self.R_0_base, D_trainable=self.D_trainable)
+    #Define forward pass which is a for loop
+    def forward(self, inputs, initial_state=None):
+        outputs = []
+        if initial_state is None:
+            state = self.cell.get_initial_state(batch_size=self.batch_size)
+
+        for input in inputs:
+            output, state = self.cell(input, state)
+            outputs.append(output)
+
+        return torch.stack(outputs), state    
