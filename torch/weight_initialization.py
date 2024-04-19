@@ -11,15 +11,18 @@ from torch.utils.data import TensorDataset, DataLoader
 class MLP(nn.Module):
     def __init__(self):
         super(MLP, self).__init__()
-        self.fc1 = nn.Linear(1, 8)
-        self.fc2 = nn.Linear(8, 4)
-        self.fc3 = nn.Linear(4, 1)
-        self.activation = nn.Tanh()
-
+        self.MLPp = nn.Sequential(
+            nn.Linear(1, 8),
+            nn.Tanh(),
+            nn.Linear(8, 4),
+            nn.Tanh(),
+            nn.Linear(4, 1)
+        )
     def forward(self, x):
-        x = self.activation(self.fc1(x))
-        x = self.activation(self.fc2(x))
-        x = self.fc3(x)
+        x = self.MLPp(x)
+        #x = self.activation(self.fc1(x))
+        #x = self.activation(self.fc2(x))
+        #x = self.fc3(x)
         return x
 
 # Create the MLP model, optimizer, and criterion
@@ -37,13 +40,13 @@ Y_tensor = torch.from_numpy(Y)
 
 # Create PyTorch Dataset and DataLoader
 dataset = TensorDataset(X_tensor, Y_tensor)
-data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+data_loader = DataLoader(dataset, batch_size=32, shuffle=True)
 
 # Learning rate scheduler
 scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
-
+print("Shapes are ",X_tensor.size(),Y_tensor.size())
 # Training loop
-num_epochs = 5000
+num_epochs = 100000
 for epoch in range(num_epochs):
     mlp.train()
     total_loss = 0.0
@@ -60,7 +63,7 @@ for epoch in range(num_epochs):
         # Backpropagation
         loss.backward()
         optimizer.step()
-
+        #scheduler.step()
         total_loss += loss.item()
 
     # Adjust learning rate using scheduler
@@ -71,7 +74,14 @@ for epoch in range(num_epochs):
         print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}")
 
 # Save model weights
-torch.save(mlp.state_dict(), 'torch_train/mlp_initial_weights.pth')
+PATH = 'torch_train/mlp_initial_weights.pth'
+torch.save({
+    'epoch': epoch,
+    'model_state_dict': mlp.state_dict(),
+    'optimizer_state_dict': optimizer.state_dict(),
+    'loss': loss
+    }, PATH)
+#torch.save(mlp.state_dict(), 'torch_train/mlp_initial_weights.pth')
 
 # Plot predictions
 mlp.eval()

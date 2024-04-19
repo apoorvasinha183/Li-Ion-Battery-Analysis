@@ -19,7 +19,8 @@ class BatteryRNNCell(nn.Module):
 
         self.state_size = 8
         self.output_size = 1
-        
+        self.initBatteryParams(batch_size, D_trainable)
+
         self.MLPp = nn.Sequential(
             nn.Linear(1, 8),
             nn.Tanh(),
@@ -34,19 +35,21 @@ class BatteryRNNCell(nn.Module):
 
         # Initialize MLPp weights
         # Load the weights from the .pth file
-        weights_path = 'mlp_initial_weights.pth'
+        weights_path = 'torch_train/mlp_initial_weights.pth'
         mlp_p_weights = torch.load(weights_path)
-
-        
+        #for keys in mlp_p_weights["model_state_dict"]:
+        #    print("keys available are ",keys)
+        #self.MLPp.load_state_dict(mlp_p_weights['model_state_dict'])
+        #self.MLPp.train()
         with torch.no_grad():
             # Assign weights and biases to each layer in the model
-            self.MLPp[0].weight.copy_(mlp_p_weights['0.weight'])
-            self.MLPp[0].bias.copy_(mlp_p_weights['0.bias'])
-            self.MLPp[2].weight.copy_(mlp_p_weights['2.weight'])
-            self.MLPp[2].bias.copy_(mlp_p_weights['2.bias'])
-            self.MLPp[4].weight.copy_(mlp_p_weights['4.weight'])
-            self.MLPp[4].bias.copy_(mlp_p_weights['4.bias'])
-
+            self.MLPp[0].weight.copy_(mlp_p_weights["model_state_dict"][ "MLPp.0.weight"])
+            self.MLPp[0].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.0.bias'])
+            self.MLPp[2].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.2.weight'])
+            self.MLPp[2].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.2.bias'])
+            self.MLPp[4].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.4.weight'])
+            self.MLPp[4].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.4.bias'])
+        print("Success!")
         # Initialize MLPn weights
         X = torch.linspace(0.0, 1.0, 100).unsqueeze(1)
         Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1)
@@ -70,7 +73,8 @@ class BatteryRNNCell(nn.Module):
         self.xnMin = torch.tensor(0.0)
         self.xpMax = torch.tensor(1.0)
         self.xpMin = torch.tensor(0.4)
-
+        if D_trainable:
+            
         self.qMaxBASE = torch.tensor(self.q_max_base_value)
         self.RoBASE = torch.tensor(self.R_0_base_value)
 

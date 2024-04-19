@@ -68,7 +68,7 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 
 time_window_size = inputs.shape[1]  # 310
 
-
+# Assume get code is 
 model = get_model(batch_input_shape=(inputs[train_idx,:,:].shape[0],time_window_size,inputs.shape[2]), dt=dt, mlp=True, share_q_r=False, stateful=True)
 
 model.compile(optimizer=tf.keras.optimizers.Adam(lr=2e-2), loss="mse", metrics=["mae"])
