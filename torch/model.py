@@ -7,7 +7,7 @@ import tensorflow as tf
 DTYPE = 'float64'
 
 #from BatteryRNNCell import BatteryRNNCell
-from BatteryRNNCell_mlp import BatteryRNNCell as BatteryRNNCellMLP
+from BatteryRNNCell_mlp import BatteryRNNCell 
 
 def get_model(batch_input_shape=None, return_sequences=True, stateful=False, dtype=DTYPE, dt=1.0, mlp=True, mlp_trainable=True, share_q_r=True, q_max_base=None, R_0_base=None, D_trainable=False):
     model = tf.keras.Sequential()
