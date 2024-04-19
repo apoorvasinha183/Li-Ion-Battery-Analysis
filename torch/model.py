@@ -17,7 +17,7 @@ def get_model(batch_input_shape=None, return_sequences=True, stateful=False, dty
     batch_size = batch_input_shape[0]
     if share_q_r:
         batch_size = 1
-    model = BatteryRNN(mlp_trainable=mlp_trainable,dt=dt,q_max_base=q_max_base,R_0_base=R_0_base,)
+    model = BatteryRNN(mlp_trainable=mlp_trainable,dt=dt,q_max_base=q_max_base,R_0_base=R_0_base,D_trainable=D_trainable,batch_size=batch_size)
     return model
 
 if __name__ == "__main__":
