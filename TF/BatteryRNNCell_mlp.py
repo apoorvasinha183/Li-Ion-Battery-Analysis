@@ -97,12 +97,12 @@ class BatteryRNNCell(Layer):
         if self.q_max_model is None:
             P.qMax = tf.Variable(np.ones(batch_size)*initial_q_max, constraint=constraint_q_max, dtype=self.dtype)  # init 0.1 - resp 0.1266
         else:
-            P.qMax = self.q_max_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.qMaxBASE
+            P.qMax = self.q_max_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.qMaxBASE #Ageing Model 
 
         if self.R_0_model is None:
             P.Ro = tf.Variable(np.ones(batch_size)*initial_R_0, constraint=constraint, dtype=self.dtype)   # init 0.15 - resp 0.117215
         else:    
-            P.Ro = self.R_0_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.RoBASE
+            P.Ro = self.R_0_model(tf.constant([[self.curr_cum_pwh]], dtype=self.dtype))[:,0,0] / P.RoBASE #Ageing Model
 
         # Constants of nature
         P.R = tf.constant(8.3144621, dtype=self.dtype)          # universal gas constant, J/K/mol
@@ -386,7 +386,7 @@ if __name__ == "__main__":
     cell = BatteryRNNCell(dtype=DTYPE, dt=dt, batch_size=inputs.shape[0])
     rnn = tf.keras.layers.RNN(cell, return_sequences=True, batch_input_shape=inputs.shape, return_state=False, dtype=DTYPE)
 
-    cell.MLPp.set_weights(np.load('./training/MLPp_best_weights.npy',allow_pickle=True))
+    cell.MLPp.set_weights(np.load('../training/mlp_initial_weight_with-I.npy',allow_pickle=True))
 
     # stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     # logdir = 'logs/func/%s' % stamp
