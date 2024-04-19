@@ -22,7 +22,7 @@ def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs_array = np.array(inputs_list)
     target_array = np.array(target_list)
 
-    # Convert to PyTorch tensors
+   
     inputs_tensor = torch.tensor(inputs_array, dtype=torch.float32)
     target_tensor = torch.tensor(target_array, dtype=torch.float32)
 
@@ -36,9 +36,9 @@ dt = np.diff(data_RW[1][2, 0])[1]
 # Get data tensors
 inputs_tensor, target_tensor = get_data_tensor(data_RW, max_idx_to_use, max_size)
 
-# Assuming BATCH_SIZE is the number of samples (inputs) in your dataset
+
 BATCH_SIZE = inputs_tensor.shape[0]
 
-# Create PyTorch DataLoader
+
 dataset = TensorDataset(inputs_tensor.unsqueeze(-1), target_tensor.unsqueeze(-1))
 train_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
