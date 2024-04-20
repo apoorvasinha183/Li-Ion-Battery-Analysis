@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from battery_data import getDischargeMultipleBatteries
 #from BatteryRNNCell_mlp import BatteryRNN
 from model import get_model
-
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
@@ -71,37 +71,35 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
         
 # Create the MLP model, optimizer, and criterion
-
-mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True)
+mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
 optimizer = optim.Adam(mlp.parameters(), lr=2e-2)
+criterion = nn.MSELoss().to(DEVICE)
 
-criterion = nn.MSELoss()
-mlp.train()
 # Prepare data
 #X = np.linspace(0.0, 1.0, 100).reshape(-1, 1).astype(np.float32)
 #Y = np.hstack([np.linspace(0.85, -0.2, 90), np.linspace(-0.25, -0.8, 10)]).reshape(-1, 1).astype(np.float32)
 X = inputs_shiffed[train_idx,:,:]
 Y = target_shiffed[train_idx,:,np.newaxis]
 # Convert data to PyTorch tensors
-X_tensor = torch.from_numpy(X)
-Y_tensor = torch.from_numpy(Y)
+X_tensor = torch.from_numpy(X).to(DEVICE)
+Y_tensor = torch.from_numpy(Y).to(DEVICE)
 
 # Create PyTorch Dataset and DataLoader
 dataset = TensorDataset(X_tensor, Y_tensor)
-data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
+data_loader = DataLoader(dataset, batch_size=15, shuffle=True)
 
 # Learning rate scheduler
 scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
-#for parameters in mlp.parameters():
-#    print(parameters)
+
 # Training loop
-num_epochs = 10000
+num_epochs = 5000
 for epoch in range(num_epochs):
     mlp.train()
     total_loss = 0.0
 
     for inputs, targets in data_loader:
-
+        inputs.to(DEVICE)
+        targets.to(DEVICE)
         # if torch.cuda.is_available():
         #     inputs = inputs.cuda()
         #     targets = targets.cuda()
@@ -109,14 +107,10 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         # Forward pass
         outputs = mlp(inputs)
-        #print("outputs has shape ",np.shape(outputs))
+
         # Compute loss
-        targets = targets[:,:,0]
-        #print("targets has shape ",targets.shape)
-        loss = criterion(outputs, targets.float())
-        #print(loss)
-        #print("loss shape is ",loss.shape)
-        #loss = loss.float()
+        loss = criterion(outputs, targets)
+
         # Backpropagation
         loss.backward()
         optimizer.step()
@@ -124,7 +118,7 @@ for epoch in range(num_epochs):
         total_loss += loss.item()
 
     # Adjust learning rate using scheduler
-    #scheduler.step()
+    scheduler.step()
 
     # Print epoch statistics
     if epoch % 100 == 0:
@@ -135,15 +129,11 @@ torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
 
 # Plot predictions
 mlp.eval()
-#X_valid = inputs_array[val_idx,:,:]
-#Y_valid = target_array[val_idx,:]
-#X_tensor = torch.from_numpy(X_valid)
 with torch.no_grad():
     pred = mlp(X_tensor).numpy()
-#print("Y has shape ",Y.shape)
-#print( Y[:1,:,0])
-plt.plot( Y[1:2,:,0][0], color='gray')
-plt.plot( pred[1:2,:][0])
+
+plt.plot(X, Y, color='gray')
+plt.plot(X, pred)
 plt.grid()
 plt.show()
 
