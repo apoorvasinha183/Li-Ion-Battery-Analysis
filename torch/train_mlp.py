@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from battery_data import getDischargeMultipleBatteries
 #from BatteryRNNCell_mlp import BatteryRNN
 from model import get_model
+
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
@@ -70,7 +71,7 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
         
 # Create the MLP model, optimizer, and criterion
-mlp = get_model(batch_input_shape=(inputs_array[train_idx,:,:].shape[0],time_window_size,inputs_array.shape[2]), dt=dt, mlp=True, share_q_r=False, stateful=True)
+mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True)
 optimizer = optim.Adam(mlp.parameters(), lr=2e-2)
 criterion = nn.MSELoss()
 
@@ -97,8 +98,12 @@ for epoch in range(num_epochs):
     total_loss = 0.0
 
     for inputs, targets in data_loader:
-        optimizer.zero_grad()
 
+        if torch.cuda.is_available():
+            inputs = inputs.cuda()
+            targets = targets.cuda()
+
+        optimizer.zero_grad()
         # Forward pass
         outputs = mlp(inputs)
 
