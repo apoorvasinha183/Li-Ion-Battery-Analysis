@@ -96,7 +96,7 @@ num_epochs = 5000
 for epoch in range(num_epochs):
     mlp.train()
     total_loss = 0.0
-
+    print("Epochs are ",epoch)
     for inputs, targets in data_loader:
         inputs.to(DEVICE)
         targets.to(DEVICE)

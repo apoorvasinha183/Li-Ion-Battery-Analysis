@@ -56,7 +56,7 @@ class BatteryRNNCell(nn.Module):
         X = torch.linspace(0.0, 1.0, 100).unsqueeze(1).to(DEVICE)
 
         Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1).to(DEVICE)
-
+        self.MLPn.to(DEVICE)
         #This is such a chad move
         self.MLPn_optim = torch.optim.Adam(self.MLPn.parameters(), lr=2e-2)
         for _ in range(200):
@@ -67,6 +67,7 @@ class BatteryRNNCell(nn.Module):
             self.MLPn_optim.step()
 
         for param in self.MLPn.parameters():
+            param.to(DEVICE)
             param.requires_grad = False
         self.MLPn.to(DEVICE)    
 
@@ -149,13 +150,13 @@ class BatteryRNNCell(nn.Module):
         Tbm = Tb - 273.15
         xpS = qpS / qSMax
         xnS = qnS / qSMax
-        xpS = xpS.to(torch.float32)
-        xnS = xnS.to(torch.float32)
+        xpS = xpS.to(torch.float32).to(DEVICE)
+        xnS = xnS.to(torch.float32).to(DEVICE)
         VepMLP = self.MLPp(xpS)
         VenMLP = self.MLPn(xnS)
 
-        safe_log_p = torch.clamp((1 - xpS) / xpS, 1e-18, 1e+18)
-        safe_log_n = torch.clamp((1 - xnS) / xnS, 1e-18, 1e+18)
+        safe_log_p = torch.clamp((1 - xpS) / xpS, 1e-18, 1e+18).to(DEVICE)
+        safe_log_n = torch.clamp((1 - xnS) / xnS, 1e-18, 1e+18).to(DEVICE)
 
         Vep = self.U0p + self.R * Tb / self.F * torch.log(safe_log_p) + VepMLP
         Ven = self.U0n + self.R * Tb / self.F * torch.log(safe_log_n) + VenMLP
@@ -254,12 +255,12 @@ class BatteryRNNCell(nn.Module):
 
         if self.initial_state is None:
             initial_state = torch.cat([
-                torch.tensor([292.1]),
-                torch.zeros(3),
-                qnBMax.reshape(1),
-                qnSMax.reshape(1),
-                qpBMin.reshape(1),
-                qpSMin.reshape(1)
+                torch.tensor([292.1]).to(DEVICE),
+                torch.zeros(3).to(DEVICE),
+                qnBMax.reshape(1).to(DEVICE),
+                qnSMax.reshape(1).to(DEVICE),
+                qpBMin.reshape(1).to(DEVICE),
+                qpSMin.reshape(1).to(DEVICE)
             ]).unsqueeze(0).to(DEVICE)
         else:
             initial_state = torch.tensor(self.initial_state).to(DEVICE)
