@@ -86,8 +86,8 @@ Y_tensor = torch.from_numpy(Y).to(DEVICE)
 
 # Create PyTorch Dataset and DataLoader
 dataset = TensorDataset(X_tensor, Y_tensor)
-data_loader = DataLoader(dataset, batch_size=15, shuffle=True)
-
+data_loader = DataLoader(dataset, batch_size=30, shuffle=True)
+print("I am loading ",len(data_loader))
 # Learning rate scheduler
 scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
 
@@ -96,7 +96,7 @@ num_epochs = 5000
 for epoch in range(num_epochs):
     mlp.train()
     total_loss = 0.0
-    print("Epochs are ",epoch)
+    #print("Epochs are ",epoch)
     for inputs, targets in data_loader:
         inputs.to(DEVICE)
         targets.to(DEVICE)
@@ -130,7 +130,7 @@ torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
 # Plot predictions
 mlp.eval()
 with torch.no_grad():
-    pred = mlp(X_tensor).numpy()
+    pred = mlp(X_tensor).cpu().numpy()
 
 plt.plot(X, Y, color='gray')
 plt.plot(X, pred)
