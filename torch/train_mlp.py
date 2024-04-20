@@ -5,9 +5,11 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 from battery_data import getDischargeMultipleBatteries
+import time
 #from BatteryRNNCell_mlp import BatteryRNN
 from model import get_model
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE =torch.device("cpu")
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
@@ -92,6 +94,7 @@ print("I am loading ",len(data_loader))
 scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
 
 # Training loop
+start = time.time()
 num_epochs = 5000
 for epoch in range(num_epochs):
     mlp.train()
@@ -122,7 +125,7 @@ for epoch in range(num_epochs):
 
     # Print epoch statistics
     if epoch % 100 == 0:
-        print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}")
+        print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}, Time : {time.time()-start}")
 
 # Save model weights
 torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
