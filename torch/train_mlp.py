@@ -131,14 +131,14 @@ for epoch in range(num_epochs):
 torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
 
 # Plot predictions
-mlp.eval()
-with torch.no_grad():
-    pred = mlp(X_tensor).cpu().numpy()
+#mlp.eval()
+#with torch.no_grad():
+#    pred = mlp(X_tensor).cpu().numpy()
 
-plt.plot(X, Y, color='gray')
-plt.plot(X, pred)
-plt.grid()
-plt.show()
+#plt.plot(X, Y, color='gray')
+#plt.plot(X, pred)
+#plt.grid()
+#plt.show()
 
 
 
