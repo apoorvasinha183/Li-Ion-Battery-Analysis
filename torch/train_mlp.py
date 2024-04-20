@@ -99,9 +99,9 @@ for epoch in range(num_epochs):
 
     for inputs, targets in data_loader:
 
-        if torch.cuda.is_available():
-            inputs = inputs.cuda()
-            targets = targets.cuda()
+        # if torch.cuda.is_available():
+        #     inputs = inputs.cuda()
+        #     targets = targets.cuda()
 
         optimizer.zero_grad()
         # Forward pass

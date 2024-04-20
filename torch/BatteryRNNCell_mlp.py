@@ -70,36 +70,36 @@ class BatteryRNNCell(nn.Module):
         self.q_max_base_value = 1.0e4 if self.q_max_base_value is None else self.q_max_base_value
         self.R_0_base_value = 1.0e1 if self.R_0_base_value is None else self.R_0_base_value
 
-        self.xnMax = torch.tensor(0.6).cuda()
-        self.xnMin = torch.tensor(0.0).cuda()
-        self.xpMax = torch.tensor(1.0).cuda()
-        self.xpMin = torch.tensor(0.4).cuda()
+        self.xnMax = torch.tensor(0.6)
+        self.xnMin = torch.tensor(0.0)
+        self.xpMax = torch.tensor(1.0)
+        self.xpMin = torch.tensor(0.4)
         if not D_trainable:
-            self.tDiffusion = torch.tensor(7e6).cuda() 
-        self.qMaxBASE = torch.tensor(self.q_max_base_value).cuda()
-        self.RoBASE = torch.tensor(self.R_0_base_value).cuda()
+            self.tDiffusion = torch.tensor(7e6) 
+        self.qMaxBASE = torch.tensor(self.q_max_base_value)
+        self.RoBASE = torch.tensor(self.R_0_base_value)
 
         if self.q_max_model is None:
-            initial_q_max = torch.tensor(1.4e4 / self.q_max_base_value).cuda()
+            initial_q_max = torch.tensor(1.4e4 / self.q_max_base_value)
             self.qMax = nn.Parameter(initial_q_max)
         else:
-            self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh).cuda()) / self.qMaxBASE
+            self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh)) / self.qMaxBASE
 
         if self.R_0_model is None:
-            initial_R_0 = torch.tensor(0.15 / self.R_0_base_value).cuda()
+            initial_R_0 = torch.tensor(0.15 / self.R_0_base_value)
             self.Ro = nn.Parameter(initial_R_0)
         else:
-            self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh).cuda()) / self.RoBASE
+            self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh)) / self.RoBASE
 
-        self.R = torch.tensor(8.3144621).cuda()
-        self.F = torch.tensor(96487).cuda()
-        self.alpha = torch.tensor(0.5).cuda()
-        self.VolSFraction = torch.tensor(0.1).cuda()
-        self.Sn = torch.tensor(2e-4).cuda()
-        self.Sp = torch.tensor(2e-4).cuda()
-        self.kn = torch.tensor(2e4).cuda()
-        self.kp = torch.tensor(2e4).cuda()
-        self.Vol = torch.tensor(2.2e-5).cuda()
+        self.R = torch.tensor(8.3144621)
+        self.F = torch.tensor(96487)
+        self.alpha = torch.tensor(0.5)
+        self.VolSFraction = torch.tensor(0.1)
+        self.Sn = torch.tensor(2e-4)
+        self.Sp = torch.tensor(2e-4)
+        self.kn = torch.tensor(2e4)
+        self.kp = torch.tensor(2e4)
+        self.Vol = torch.tensor(2.2e-5)
 
         self.VolS = self.VolSFraction * self.Vol
         self.VolB = self.Vol - self.VolS
@@ -119,12 +119,12 @@ class BatteryRNNCell(nn.Module):
         self.qSMax = self.qMax * self.qMaxBASE * self.VolS / self.Vol
         self.qBMax = self.qMax * self.qMaxBASE * self.VolB / self.Vol
 
-        self.t0 = torch.tensor(10.0).cuda()
-        self.tsn = torch.tensor(90.0).cuda()
-        self.tsp = torch.tensor(90.0).cuda()
-        self.U0p = torch.tensor(4.03).cuda()
-        self.U0n = torch.tensor(0.01).cuda()
-        self.VEOD = torch.tensor(3.0).cuda()
+        self.t0 = torch.tensor(10.0)
+        self.tsn = torch.tensor(90.0)
+        self.tsp = torch.tensor(90.0)
+        self.U0p = torch.tensor(4.03)
+        self.U0n = torch.tensor(0.01)
+        self.VEOD = torch.tensor(3.0)
 
     def forward(self, inputs, states=None):
         if states is None:
@@ -145,8 +145,8 @@ class BatteryRNNCell(nn.Module):
         xnS = qnS / qSMax
         xpS = xpS.to(torch.float32)
         xnS = xnS.to(torch.float32)
-        VepMLP = self.MLPp(xpS.cuda())
-        VenMLP = self.MLPn(xnS.cuda())
+        VepMLP = self.MLPp(xpS)
+        VenMLP = self.MLPn(xnS)
 
         safe_log_p = torch.clamp((1 - xpS) / xpS, 1e-18, 1e+18)
         safe_log_n = torch.clamp((1 - xnS) / xnS, 1e-18, 1e+18)
@@ -169,10 +169,10 @@ class BatteryRNNCell(nn.Module):
         xpS = torch.clamp(qpS / qSMax, 1e-18, 1.0)
         xnS = torch.clamp(qnS / qSMax, 1e-18, 1.0)
         Jn0 = 1e-18 + self.kn * (1 - xnS) ** self.alpha * (xnS) ** self.alpha
-        Jn0 = Jn0.cuda()
+        # Jn0 = Jn0
         
         Jp0 = 1e-18 + self.kp * (1 - xpS) ** self.alpha * (xpS) ** self.alpha
-        Jp0 = Jp0.cuda()
+        # Jp0 = Jp0
 
         Tbdot = torch.zeros_like(i)
         
@@ -182,12 +182,12 @@ class BatteryRNNCell(nn.Module):
         CpBulk = qpB / self.VolB
         qdotDiffusionBSn = (CnBulk - CnSurface) / self.tDiffusion
 
-        qdotDiffusionBSn = qdotDiffusionBSn.cuda()
+        qdotDiffusionBSn = qdotDiffusionBSn
 
         qnBdot = -qdotDiffusionBSn * torch.ones_like(i) 
 
         qdotDiffusionBSp = (CpBulk - CpSurface) / self.tDiffusion
-        qdotDiffusionBSp = qdotDiffusionBSp.cuda()
+        # qdotDiffusionBSp = qdotDiffusionBSp
 
         qpBdot = -qdotDiffusionBSp * torch.ones_like(i) 
         qpSdot = i + qdotDiffusionBSp
@@ -234,10 +234,10 @@ class BatteryRNNCell(nn.Module):
     def get_initial_state(self):
         self.initBatteryParams(D_trainable=False)
         if self.q_max_model is not None:
-            self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh).cuda()) / self.qMaxBASE
+            self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh)) / self.qMaxBASE
         
         if self.R_0_model is not None:
-            self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh).cuda()) / self.RoBASE
+            self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh)) / self.RoBASE
         
         qpMin = self.qMax * self.qMaxBASE * self.xpMin
         qpSMin = qpMin * self.VolS / self.Vol
@@ -248,8 +248,8 @@ class BatteryRNNCell(nn.Module):
 
         if self.initial_state is None:
             initial_state = torch.cat([
-                torch.tensor([292.1]).cuda(),
-                torch.zeros(3).cuda(),
+                torch.tensor([292.1]),
+                torch.zeros(3),
                 qnBMax.reshape(1),
                 qnSMax.reshape(1),
                 qpBMin.reshape(1),
