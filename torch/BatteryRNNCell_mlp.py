@@ -51,6 +51,7 @@ class BatteryRNNCell(nn.Module):
             self.MLPp[5].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.weight'])
             self.MLPp[5].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.bias'])
         #print("Success!")
+        self.MLPp.train()
         # Initialize MLPn weights
         X = torch.linspace(0.0, 1.0, 100).unsqueeze(1)
         Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1)
@@ -81,13 +82,13 @@ class BatteryRNNCell(nn.Module):
 
         if self.q_max_model is None:
             initial_q_max = torch.tensor(1.4e4 / self.q_max_base_value)
-            self.qMax = nn.Parameter(initial_q_max * torch.ones(batch_size))
+            self.qMax = nn.Parameter(initial_q_max * torch.ones(batch_size),requires_grad=True)
         else:
             self.qMax = self.q_max_model(torch.tensor([[self.curr_cum_pwh]]))[:, 0, 0] / self.qMaxBASE
 
         if self.R_0_model is None:
             initial_R_0 = torch.tensor(0.15 / self.R_0_base_value)
-            self.Ro = nn.Parameter(initial_R_0 * torch.ones(batch_size))
+            self.Ro = nn.Parameter(initial_R_0 * torch.ones(batch_size),requires_grad=True)
         else:
             self.Ro = self.R_0_model(torch.tensor([[self.curr_cum_pwh]]))[:, 0, 0] / self.RoBASE
 

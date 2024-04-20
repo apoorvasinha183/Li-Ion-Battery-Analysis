@@ -84,7 +84,7 @@ model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     save_best_only=True)
 reduce_lr_on_plateau = tf.keras.callbacks.ReduceLROnPlateau(
     monitor='loss', 
-    factor=0.5, 
+    factor=0.9999999999, 
     min_lr=1e-6, 
     patience=25,
     min_delta=1e-10,
@@ -109,7 +109,7 @@ scheduler_cb = tf.keras.callbacks.LearningRateScheduler(scheduler)
 EPOCHS = 1000
 
 
-callbacks = [model_checkpoint_callback,reduce_lr_on_plateau,resetStateCallback()]
+callbacks = [model_checkpoint_callback,resetStateCallback()]
 
 BLOCK = False
 if not BLOCK:
