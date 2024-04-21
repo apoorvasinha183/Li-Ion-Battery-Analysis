@@ -5,7 +5,7 @@ import numpy as np
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE =torch.device("cpu")
 class BatteryRNNCell(nn.Module):
-    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, q_max_base=None, R_0_base=None, D_trainable=False):
+    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, q_max_base=None, R_0_base=None, D_trainable=False,WARM_START=True):
         super(BatteryRNNCell, self).__init__()
 
         self.initial_state = initial_state
@@ -43,17 +43,19 @@ class BatteryRNNCell(nn.Module):
         #    print("keys available are ",keys)
         #self.MLPp.load_state_dict(mlp_p_weights['model_state_dict'])
         #self.MLPp.train()
-        with torch.no_grad():
-            # Assign weights and biases to each layer in the model
-            self.MLPp[1].weight.copy_(mlp_p_weights["model_state_dict"][ "MLPp.1.weight"])
-            self.MLPp[1].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.1.bias'])
-            self.MLPp[3].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.weight'])
-            self.MLPp[3].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.bias'])
-            self.MLPp[5].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.weight'])
-            self.MLPp[5].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.bias'])
+        self.WARM_START = WARM_START
+        if self.WARM_START:
+            with torch.no_grad():
+                # Assign weights and biases to each layer in the model
+                self.MLPp[1].weight.copy_(mlp_p_weights["model_state_dict"][ "MLPp.1.weight"])
+                self.MLPp[1].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.1.bias'])
+                self.MLPp[3].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.weight'])
+                self.MLPp[3].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.bias'])
+                self.MLPp[5].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.weight'])
+                self.MLPp[5].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.bias'])
         # print("Success!")
         # Initialize MLPn weights
-        self.MLPp.to(DEVICE)
+            self.MLPp.to(DEVICE)
         X = torch.linspace(0.0, 1.0, 100).unsqueeze(1).to(DEVICE)
 
         Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1).to(DEVICE)
@@ -270,7 +272,7 @@ class BatteryRNNCell(nn.Module):
 
 #This is the true RNN cell
 class BatteryRNN(nn.Module):
-    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, q_max_base=None, R_0_base=None, D_trainable=False):
+    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, q_max_base=None, R_0_base=None, D_trainable=False,WARM_START=True):
         super(BatteryRNN,self).__init__()
         self.q_max_model = q_max_model
         self.R_0_model = R_0_model
@@ -282,7 +284,8 @@ class BatteryRNN(nn.Module):
         self.q_max_base = q_max_base
         self.R_0_base = R_0_base
         self.D_trainable = D_trainable
-        self.cell = BatteryRNNCell(q_max_model=self.q_max_model, R_0_model=self.R_0_model, curr_cum_pwh=self.curr_cum_pwh, initial_state=self.initial_state, dt=self.dt, qMobile=self.qMobile, mlp_trainable=self.mlp_trainable, q_max_base=self.q_max_base, R_0_base=self.R_0_base, D_trainable=self.D_trainable)
+        self.WARM_START = WARM_START
+        self.cell = BatteryRNNCell(q_max_model=self.q_max_model, R_0_model=self.R_0_model, curr_cum_pwh=self.curr_cum_pwh, initial_state=self.initial_state, dt=self.dt, qMobile=self.qMobile, mlp_trainable=self.mlp_trainable, q_max_base=self.q_max_base, R_0_base=self.R_0_base, D_trainable=self.D_trainable,WARM_START=self.WARM_START)
 
     #Define forward pass which is a for loop
     def forward(self, inputs, initial_state=None):

@@ -10,6 +10,8 @@ import time
 from model import get_model
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE =torch.device("cpu")
+EXPERIMENT = False #Compares and plots watm-start vs random initialization
+NUM_EPOCHS = 2001
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
@@ -95,7 +97,8 @@ scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch <
 
 # Training loop
 start = time.time()
-num_epochs = 5000
+num_epochs = NUM_EPOCHS
+loss_warm_start = []
 for epoch in range(num_epochs):
     mlp.train()
     total_loss = 0.0
@@ -121,10 +124,11 @@ for epoch in range(num_epochs):
         total_loss += loss.item()
 
     # Adjust learning rate using scheduler
-    scheduler.step()
+    #scheduler.step()   <-- no idea why they do this we have ADAM
 
     # Print epoch statistics
     if epoch % 100 == 0:
+        loss_warm_start.append(total_loss / len(data_loader))
         print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}, Time : {time.time()-start}")
 
 # Save model weights
@@ -146,3 +150,78 @@ torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
 
 
 ###### FOR REFERENCE : TRAINING ENDS HERE #########        
+###### This is a small experiment comparing warm_start with random start ########
+if EXPERIMENT:
+    mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True,WARM_START=False).to(DEVICE)
+    optimizer = optim.Adam(mlp.parameters(), lr=2e-2)
+    criterion = nn.MSELoss().to(DEVICE)
+
+    # Prepare data
+    #X = np.linspace(0.0, 1.0, 100).reshape(-1, 1).astype(np.float32)
+    #Y = np.hstack([np.linspace(0.85, -0.2, 90), np.linspace(-0.25, -0.8, 10)]).reshape(-1, 1).astype(np.float32)
+    X = inputs_shiffed[train_idx,:,:]
+    Y = target_shiffed[train_idx,:,np.newaxis]
+    # Convert data to PyTorch tensors
+    X_tensor = torch.from_numpy(X).to(DEVICE)
+    Y_tensor = torch.from_numpy(Y).to(DEVICE)
+
+    # Create PyTorch Dataset and DataLoader
+    dataset = TensorDataset(X_tensor, Y_tensor)
+    data_loader = DataLoader(dataset, batch_size=30, shuffle=True)
+    print("I am loading ",len(data_loader))
+    # Learning rate scheduler
+    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
+
+    # Training loop
+    start = time.time()
+    num_epochs = NUM_EPOCHS
+    loss_cold_start = []
+    for epoch in range(num_epochs):
+        mlp.train()
+        total_loss = 0.0
+        #print("Epochs are ",epoch)
+        for inputs, targets in data_loader:
+            inputs.to(DEVICE)
+            targets.to(DEVICE)
+            # if torch.cuda.is_available():
+            #     inputs = inputs.cuda()
+            #     targets = targets.cuda()
+
+            optimizer.zero_grad()
+            # Forward pass
+            outputs = mlp(inputs)
+
+            # Compute loss
+            loss = criterion(outputs, targets)
+
+            # Backpropagation
+            loss.backward()
+            optimizer.step()
+            #scheduler.step()
+            total_loss += loss.item()
+
+        # Adjust learning rate using scheduler
+        #scheduler.step()
+
+        # Print epoch statistics
+        if epoch % 100 == 0:
+            loss_cold_start.append(total_loss / len(data_loader))
+            print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}, Time : {time.time()-start}")
+
+    #Plot the two
+    plt.plot(loss_warm_start)
+    plt.plot(loss_cold_start)
+    plt.ylabel('MSE(Loss)')
+    plt.grid()
+
+    plt.xlabel('Epoch(unit of 100)')
+    plt.savefig('figures/trainingtrend.png')
+    plt.show()
+###### This is a small experiment comparing warm_start with random start ########
+    
+######## Validation is done here ##########
+    
+
+
+
+######## Validation is done here ##########
