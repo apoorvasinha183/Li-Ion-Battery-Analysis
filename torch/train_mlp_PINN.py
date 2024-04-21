@@ -8,6 +8,7 @@ from battery_data import getDischargeMultipleBatteries
 #from BatteryRNNCell_mlp import BatteryRNN
 from model import get_model
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
@@ -71,9 +72,19 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
         
 # Create the MLP model, optimizer, and criterion
-mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
+mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True, version="naive_PINN").to(DEVICE)
 optimizer = optim.Adam(mlp.parameters(), lr=2e-2)
-criterion = nn.MSELoss().to(DEVICE)
+
+def pi_loss(Volt, Vep, Ven, Vo, Vsn, Vsp, targets):
+    mse_loss = nn.MSELoss()
+    targets = targets.permute(0, 2, 1)
+    mse = mse_loss(Volt, targets)
+    phy_feasible_loss = (Volt - (Vep - Ven - Vo - Vsn - Vsp))**2
+    return mse + phy_feasible_loss
+
+#criterion = pi_loss()
+
+
 
 # Prepare data
 #X = np.linspace(0.0, 1.0, 100).reshape(-1, 1).astype(np.float32)
@@ -106,10 +117,10 @@ for epoch in range(num_epochs):
 
         optimizer.zero_grad()
         # Forward pass
-        outputs = mlp(inputs)
-
+        out = mlp(inputs)
+        Volt, Vep, Ven, Vo, Vsn, Vsp = out.split(1, dim=1)
         # Compute loss
-        loss = criterion(outputs, targets)
+        loss = pi_loss(Volt, Vep, Ven, Vo, Vsn, Vsp, targets)
 
         # Backpropagation
         loss.backward()
@@ -125,7 +136,7 @@ for epoch in range(num_epochs):
         print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}")
 
 # Save model weights
-torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
+torch.save(mlp.state_dict(), 'torch_train/trained_weights_PINN.pth')
 
 # Plot predictions
 mlp.eval()

@@ -10,9 +10,13 @@ DTYPE = 'float64'
 
 #from BatteryRNNCell import BatteryRNNCell
 from BatteryRNNCell_mlp import BatteryRNNCell,BatteryRNN
+from BatteryRNNCell_PINN import BatteryRNNCell_PINN, BatteryRNN_PINN
 
-def get_model(return_sequences=True, stateful=False, dtype=DTYPE, dt=1.0, mlp=True, mlp_trainable=True, share_q_r=True, q_max_base=None, R_0_base=None, D_trainable=False,WARM_START=True):
-    model = BatteryRNN(mlp_trainable=mlp_trainable,dt=dt,q_max_base=q_max_base,R_0_base=R_0_base,D_trainable=D_trainable,WARM_START= WARM_START)
+def get_model(return_sequences=True, stateful=False, dtype=DTYPE, dt=1.0, mlp=True, mlp_trainable=True, share_q_r=True, q_max_base=None, R_0_base=None, D_trainable=False,WARM_START=True, version = "original_paper"):
+    if version == "original_paper":
+        model = BatteryRNN(mlp_trainable=mlp_trainable,dt=dt,q_max_base=q_max_base,R_0_base=R_0_base,D_trainable=D_trainable,WARM_START= WARM_START)
+    if version == "naive_PINN":
+        model = BatteryRNN_PINN(mlp_trainable=mlp_trainable,dt=dt,q_max_base=q_max_base,R_0_base=R_0_base,D_trainable=D_trainable,WARM_START= WARM_START)
     return model
 
 if __name__ == "__main__":

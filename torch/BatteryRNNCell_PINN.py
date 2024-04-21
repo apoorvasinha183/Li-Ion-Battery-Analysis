@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-class BatteryRNNCell(nn.Module):
-    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, q_max_base=None, R_0_base=None, D_trainable=False):
-        super(BatteryRNNCell, self).__init__()
+class BatteryRNNCell_PINN(nn.Module):
+    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, q_max_base=None, R_0_base=None, D_trainable=False, WARM_START = True):
+        super(BatteryRNNCell_PINN, self).__init__()
 
         # Arguments Initialization
         self.initial_state = initial_state
@@ -79,9 +79,19 @@ class BatteryRNNCell(nn.Module):
         self.MLPn.to(DEVICE)
 
         """
-        # Define the NN layers for NextState and NextOutput ---> Vanishing Gradients
+        # Define the NN layers for NextOutput 
+        self.lin1 = nn.Linear(17, 34)
+        self.lin2 = nn.Linear(34, 17)
+        self.lin3 = nn.Linear(17, 6)
+        self.TanH = nn.Tanh()
+        self.LeakyReLU = nn.LeakyReLU()
 
-        self.lin1 = nn.Linear()
+        # Define the NN layers for NextState
+        self.states_lin1 = nn.Linear(26, 52)
+        self.states_lin2 = nn.Linear(52, 26)
+        self.states_lin3 = nn.Linear(26, 8)
+
+
 
 
     def initBatteryParams(self,D_trainable):
@@ -154,39 +164,27 @@ class BatteryRNNCell(nn.Module):
         if states is None:
             states = self.get_initial_state()
         
-        # print("states have ")
+        #print("states have ")
         next_states = self.getNextState(states, inputs)
-        # print("returned next states")
+        #print("returned next states")
         output = self.getNextOutput(next_states, inputs)
-        # print("returned next output")
+        #print("returned next output")
         return output, next_states
 
-    def getNextOutput(self, X, i):
-        """
-        Tb, Vo, Vsn, Vsp, qnB, qnS, qpB, qpS = X.split(1, dim=1)
-
-        qSMax = (self.qMax * self.qMaxBASE) * self.VolS / self.Vol
-        Tbm = Tb - 273.15
-
-        
-
-
-        xpS = qpS / qSMax
-        xnS = qnS / qSMax
-        xpS = xpS.to(torch.float32)
-        xnS = xnS.to(torch.float32)
-        VepMLP = self.MLPp(xpS)
-        VenMLP = self.MLPn(xnS)
-
-        safe_log_p = torch.clamp((1 - xpS) / xpS, 1e-18, 1e+18)
-        safe_log_n = torch.clamp((1 - xnS) / xnS, 1e-18, 1e+18)
-
-        Vep = self.U0p + self.R * Tb / self.F * torch.log(safe_log_p) + VepMLP
-        Ven = self.U0n + self.R * Tb / self.F * torch.log(safe_log_n) + VenMLP
-        Volt = Vep - Ven - Vo - Vsn - Vsp"""
-
+    def getNextOutput(self, states, i):
         other_inputs = torch.tensor([self.qMax, self.qMaxBASE, self.VolS, self.Vol, self.U0n, self.U0p, self.R, self.F])
-        X = torch.stack(X, other_inputs, torch.tensor([i]), dim=1) # size 8+8+1
+        other_inputs = other_inputs.repeat(i.size(0), 1)
+        other_inputs = other_inputs.to(torch.float)
+        i = i.to(torch.float)
+
+       
+
+
+        inputs = torch.cat([i, other_inputs], dim=1)
+        #print(f"Input shape: {inputs.shape}")
+        #print(f"State shape: {states.shape}")
+        X = torch.cat([states, inputs], dim=1)
+        #print(f"Pre NN shape: {X.shape}")
 
         layer1 = self.lin1(X)
         out1 = self.LeakyReLU(layer1)
@@ -195,91 +193,41 @@ class BatteryRNNCell(nn.Module):
         layer3 = self.lin3(out2)
         out = self.TanH(layer3)
 
-        Volt, Vep, Ven, Vo, Vsn, Vsp = out.split(1, dim=1)
+        #print(f"Final out shape:{out.shape}")  
 
-        return Volt, Vep, Ven, Vo, Vsn, Vsp
+        #Volt, Vep, Ven, Vo, Vsn, Vsp = out.split(1, dim=1)
 
-    def getNextState(self, X, i):
+        return out
 
-        """
-        Tb, Vo, Vsn, Vsp, qnB, qnS, qpB, qpS = X.split(1, dim=1)
+    def getNextState(self, states, i):
 
-        # print(Tb.shape,Vo.shape,Vsn.shape,Vsp.shape,qnB.shape,qnS.shape,qpB.shape,qpS.shape)
-
-        qSMax = (self.qMax * self.qMaxBASE) * self.VolS / self.Vol
-        xpS = torch.clamp(qpS / qSMax, 1e-18, 1.0)
-        xnS = torch.clamp(qnS / qSMax, 1e-18, 1.0)
-        Jn0 = 1e-18 + self.kn * (1 - xnS) ** self.alpha * (xnS) ** self.alpha
-        # Jn0 = Jn0
-        
-        Jp0 = 1e-18 + self.kp * (1 - xpS) ** self.alpha * (xpS) ** self.alpha
-        # Jp0 = Jp0
-
-        Tbdot = torch.zeros_like(i)
-        
-        CnBulk = qnB / self.VolB
-        CnSurface = qnS / self.VolS
-        CpSurface = qpS / self.VolS
-        CpBulk = qpB / self.VolB
-        qdotDiffusionBSn = (CnBulk - CnSurface) / self.tDiffusion
-
-        qdotDiffusionBSn = qdotDiffusionBSn
-
-        qnBdot = -qdotDiffusionBSn * torch.ones_like(i) 
-
-        qdotDiffusionBSp = (CpBulk - CpSurface) / self.tDiffusion
-        # qdotDiffusionBSp = qdotDiffusionBSp
-
-        qpBdot = -qdotDiffusionBSp * torch.ones_like(i) 
-        qpSdot = i + qdotDiffusionBSp
-        Jn = i / self.Sn
-        VoNominal = i * self.Ro * self.RoBASE
-        Jp = i / self.Sp
-        qnSdot = qdotDiffusionBSn - i
-
-        VsnNominal = self.R * Tb / self.F / self.alpha * torch.asinh(Jn / (2 * Jn0))
-        
-        Vodot = (VoNominal - Vo) / self.t0
-        VspNominal = self.R * Tb / self.F / self.alpha * torch.asinh(Jp / (2 * Jp0))
-        Vsndot = (VsnNominal - Vsn) / self.tsn
-        Vspdot = (VspNominal - Vsp) / self.tsp
-        dt = self.dt
-
-        # Calculate new values for each variable based on dt
-        Tb_new = Tb + Tbdot * dt
-        Vo_new = Vo + Vodot * dt
-        Vsn_new = Vsn + Vsndot * dt
-        Vsp_new = Vsp + Vspdot * dt
-        qnB_new = qnB + qnBdot * dt
-        qnS_new = qnS + qnSdot * dt
-        qpB_new = qpB + qpBdot * dt
-        qpS_new = qpS + qpSdot * dt
-        
-        # print(Tb_new.shape,Vo_new.shape,Vsn_new.shape,Vsp_new.shape,qnB_new.shape,qnS_new.shape,qpB_new.shape,qpS_new.shape)
-
-        # Concatenate all the tensors into a single tensor along dimension 1
-        XNew = torch.cat([
-            Tb_new,  
-            Vo_new,
-            Vsn_new,
-            Vsp_new,
-            qnB_new,
-            qnS_new,
-            qpB_new,
-            qpS_new
-        ], dim=1)
-       
-        # print("Update state has size ",XNew.shape)"""
-
+        # Repeat other_inputs tensor along dimension 0 to match the size of i
         other_inputs = torch.tensor([self.qMax, self.qMaxBASE, self.VolS, self.kn, self.kp, self.alpha, self.VolB, self.tDiffusion, self.Sn, self.Sp, self.Ro, self.RoBASE, self.R, self.F, self.tsn, self.tsp, self.dt])
-        X = torch.stack(X, other_inputs, torch.tensor([i]), dim=1) # size 8+8
+        other_inputs = other_inputs.repeat(i.size(0), 1)
 
-        ### NN ##
-        XNew = X
+        # Convert other_inputs to Float data type
+        other_inputs = other_inputs.to(torch.float)
+        i = i.to(torch.float)
 
+        # Concatenate i and repeated other_inputs into a single tensor
+        inputs = torch.cat([i, other_inputs], dim=1)
 
+        
+        # Concatenate states and inputs along dimension 1
+        X = torch.cat([states, inputs], dim=1)
+
+        
+
+        layer1 = self.states_lin1(X)
+        out1 = self.LeakyReLU(layer1)
+        layer2 = self.states_lin2(out1)
+        out2 = self.LeakyReLU(layer2)
+        layer3 = self.states_lin3(out2)
+        XNew = self.TanH(layer3)
+
+       
         return XNew
-
+    
     def get_initial_state(self):
         self.initBatteryParams(D_trainable=False)
         if self.q_max_model is not None:
@@ -306,13 +254,12 @@ class BatteryRNNCell(nn.Module):
             ]).unsqueeze(0).to(DEVICE)
         else:
             initial_state = torch.tensor(self.initial_state).to(DEVICE)
-        # print("initial state has size ",initial_state.shape)
         return initial_state
 
 #This is the true RNN cell
-class BatteryRNN(nn.Module):
-    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, q_max_base=None, R_0_base=None, D_trainable=False):
-        super(BatteryRNN,self).__init__()
+class BatteryRNN_PINN(nn.Module):
+    def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, q_max_base=None, R_0_base=None, D_trainable=False, WARM_START=True):
+        super(BatteryRNN_PINN,self).__init__()
         self.q_max_model = q_max_model
         self.R_0_model = R_0_model
         self.curr_cum_pwh = curr_cum_pwh
@@ -323,19 +270,19 @@ class BatteryRNN(nn.Module):
         self.q_max_base = q_max_base
         self.R_0_base = R_0_base
         self.D_trainable = D_trainable
-        self.cell = BatteryRNNCell(q_max_model=self.q_max_model, R_0_model=self.R_0_model, curr_cum_pwh=self.curr_cum_pwh, initial_state=self.initial_state, dt=self.dt, qMobile=self.qMobile, mlp_trainable=self.mlp_trainable, q_max_base=self.q_max_base, R_0_base=self.R_0_base, D_trainable=self.D_trainable)
+        self.WARM_START = WARM_START
+        self.cell = BatteryRNNCell_PINN(q_max_model=self.q_max_model, R_0_model=self.R_0_model, curr_cum_pwh=self.curr_cum_pwh, initial_state=self.initial_state, dt=self.dt, qMobile=self.qMobile, mlp_trainable=self.mlp_trainable, q_max_base=self.q_max_base, R_0_base=self.R_0_base, D_trainable=self.D_trainable, WARM_START=True)
 
     #Define forward pass which is a for loop
     def forward(self, inputs, initial_state=None):
         outputs = []
         if initial_state is None:
             state = self.cell.get_initial_state()
-
+        
+        state = state.repeat(inputs.size(0), 1)
         for t in range(inputs.shape[1]):
             output, state = self.cell(inputs[:,t,:], state)
-            outputs.append(output)
+            outputs.append(output.unsqueeze(-1))
 
-        # print(outputs)
-        # outputs = torch.stack(outputs)
-        # print(outputs.shape)
-        return torch.cat(outputs, 1).unsqueeze(-1)
+        
+        return torch.cat(outputs, 2)
