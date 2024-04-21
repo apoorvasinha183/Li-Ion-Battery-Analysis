@@ -105,8 +105,8 @@ val_idx = np.linspace(0,35,6,dtype=int)
 train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 
 inputs_shiffed_all = inputs_shiffed
-inputs_all = inputs
-target_all = target
+inputs_all = inputs[train_idx,:,:]
+target_all = target[train_idx,:,np.newaxis]
 target_shiffed_all = target_shiffed
 reach_EOD_all = reach_EOD
 # inputs_shiffed = inputs_shiffed[train_idx,:,:]
@@ -119,7 +119,7 @@ model_eval = get_model(batch_input_shape=(1,time_window_size-SIMULATION_OVER_STE
 model_eval.compile(optimizer='adam', loss="mse", metrics=["mae"])
 print(inputs.shape)
 #TODO: Shape mismatch here
-model = get_model(batch_input_shape=inputs.shape, dt=dt, mlp=True, share_q_r=False)
+model = get_model(batch_input_shape=inputs[train_idx,:,:].shape, dt=dt, mlp=True, share_q_r=False)
 model.compile(optimizer='adam', loss="mse", metrics=["mae"])
 
 

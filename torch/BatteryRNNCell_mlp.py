@@ -71,7 +71,7 @@ class BatteryRNNCell(nn.Module):
 
         for param in self.MLPn.parameters():
             param.to(DEVICE)
-            param.requires_grad = False
+            #param.requires_grad = False
         self.MLPn.to(DEVICE)    
 
     def initBatteryParams(self,D_trainable):
@@ -89,14 +89,14 @@ class BatteryRNNCell(nn.Module):
 
         if self.q_max_model is None:
             initial_q_max = torch.tensor(1.4e4 / self.q_max_base_value).to(DEVICE)
-            self.qMax = nn.Parameter(initial_q_max).to(DEVICE)
+            self.qMax = nn.Parameter(initial_q_max,requires_grad=True).to(DEVICE)
         else:
             self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh)) / self.qMaxBASE
             self.qMax.to(DEVICE)
 
         if self.R_0_model is None:
             initial_R_0 = torch.tensor(0.15 / self.R_0_base_value)
-            self.Ro = nn.Parameter(initial_R_0).to(DEVICE)
+            self.Ro = nn.Parameter(initial_R_0,requires_grad=True).to(DEVICE)
         else:
             self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh)) / self.RoBASE
             self.Ro.to(DEVICE)

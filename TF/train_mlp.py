@@ -60,6 +60,7 @@ for row in np.argwhere((target<EOD) | (np.isnan(target))):
         inputs_shiffed[row[0],:,0] = np.zeros(time_window_size)
         inputs_shiffed[row[0],:,0][time_window_size-row[1]:] = inputs[row[0],:,0][:row[1]]
         target_shiffed[row[0]] = np.ones(time_window_size) * target[row[0]][0]
+        
         target_shiffed[row[0]][time_window_size-row[1]:] = target[row[0]][:row[1]]
 
 #TRAIN-TEST SPLIT

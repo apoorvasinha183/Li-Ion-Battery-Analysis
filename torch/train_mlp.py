@@ -11,7 +11,8 @@ from model import get_model
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE =torch.device("cpu")
 EXPERIMENT = False #Compares and plots watm-start vs random initialization
-NUM_EPOCHS = 2001
+NUM_EPOCHS = 1001
+NUM_CHECK = 1 # Between 1 and 6 .How many batteries do you want to evaluate
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
@@ -64,12 +65,14 @@ for row in np.argwhere((target_array<EOD) | (np.isnan(target_array))):
         inputs_shiffed[row[0],:,0] = np.zeros(time_window_size) # Put zeros to keep data sane
         inputs_shiffed[row[0],:,0][time_window_size-row[1]:] = inputs_array[row[0],:,0][:row[1]]
         target_shiffed[row[0]] = np.ones(time_window_size) * target_array[row[0]][0]
+        #print("shifted targets are ",target_shiffed[row[0]])
         target_shiffed[row[0]][time_window_size-row[1]:] = target_array[row[0]][:row[1]]
 #dataset = TensorDataset(inputs_tensor.unsqueeze(-1), target_tensor.unsqueeze(-1))
 #train_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 val_idx = np.linspace(0,35,6,dtype=int)
+#val_idx = np.array([0])
 train_idx = [i for i in np.arange(0,36) if i not in val_idx]
-
+#train_idx = np.array([1])
 ###### FOR REFERENCE : DATA INGESTION ENDS HERE ##########
         
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
@@ -78,7 +81,8 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
 optimizer = optim.Adam(mlp.parameters(), lr=2e-2)
 criterion = nn.MSELoss().to(DEVICE)
-
+param_count = sum(p.numel() for p in mlp.parameters() if p.requires_grad)
+print("Total number of trainable parameters are ",param_count)
 # Prepare data
 #X = np.linspace(0.0, 1.0, 100).reshape(-1, 1).astype(np.float32)
 #Y = np.hstack([np.linspace(0.85, -0.2, 90), np.linspace(-0.25, -0.8, 10)]).reshape(-1, 1).astype(np.float32)
@@ -94,7 +98,8 @@ data_loader = DataLoader(dataset, batch_size=30, shuffle=True)
 print("I am loading ",len(data_loader))
 # Learning rate scheduler
 scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
-
+untrained_parameter_value = [mlp.cell.MLPp[1].weight.data,mlp.cell.Ro.data.item()]
+print("UnTrained Parameter Value:", untrained_parameter_value)
 # Training loop
 start = time.time()
 num_epochs = NUM_EPOCHS
@@ -133,7 +138,8 @@ for epoch in range(num_epochs):
 
 # Save model weights
 torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
-
+trained_parameter_value = [mlp.cell.MLPp[1].weight.data,mlp.cell.Ro.data.item()]
+print("Trained Parameter Value:", trained_parameter_value)
 # Plot predictions
 #mlp.eval()
 #with torch.no_grad():
@@ -220,8 +226,25 @@ if EXPERIMENT:
 ###### This is a small experiment comparing warm_start with random start ########
     
 ######## Validation is done here ##########
-    
+mlp.eval()
+# Time for the test set
+X = inputs_array[val_idx,:,:]
+Y = target_array[val_idx,:,np.newaxis]  
+X_tensor = torch.from_numpy(X).to(DEVICE)
+Y_tensor = torch.from_numpy(Y).to(DEVICE)
+with torch.no_grad():
+    pred = mlp(X_tensor).cpu().numpy()
 
+#plt.plot(X, Y, color='gray')
+print("Predictions have shape ",pred.shape)
+for i in range(NUM_CHECK):
+    plt.plot(pred[i,:,0],linestyle='dashed')
+    plt.plot(Y_tensor[i,:,0])
+plt.ylabel('Voltage(V)')
+plt.grid()
 
+plt.xlabel('Time')
+plt.savefig('figures/predictionvsreality.png')
+plt.show()
 
 ######## Validation is done here ##########
