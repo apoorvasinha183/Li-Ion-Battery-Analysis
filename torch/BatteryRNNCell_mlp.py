@@ -53,11 +53,10 @@ class BatteryRNNCell(nn.Module):
                 self.MLPp[3].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.bias'])
                 self.MLPp[5].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.weight'])
                 self.MLPp[5].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.bias'])
-        # print("Success!")
-        # Initialize MLPn weights
-            self.MLPp.to(DEVICE)
-        X = torch.linspace(0.0, 1.0, 100).unsqueeze(1).to(DEVICE)
 
+            self.MLPp.to(DEVICE)
+
+        X = torch.linspace(0.0, 1.0, 100).unsqueeze(1).to(DEVICE)
         Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1).to(DEVICE)
         self.MLPn.to(DEVICE)
         #This is such a chad move
