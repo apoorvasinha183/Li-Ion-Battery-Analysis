@@ -43,7 +43,10 @@ for k,rw_data in data_RW.items():
         inputs_time.append(time[last_idx:curr_idx])
         target.append(voltage_target[last_idx:curr_idx])
         last_idx = curr_idx
-
+inputs_orig = inputs.copy()
+targets_orig = target.copy()
+inputs_orig = np.vstack(inputs_orig)[:,:,np.newaxis]
+targets_orig = np.vstack(targets_orig)
 # add nan to end of seq to have all seq in same size
 for i in range(len(inputs)):
     prep_inputs = np.full(max_size, np.nan)
@@ -107,8 +110,8 @@ with torch.no_grad():
 ######## Validation is done here ##########
 mlp.eval()
 # Time for the test set
-X = inputs[::10,:,:]
-Y = target[::10,:,np.newaxis]
+X = inputs_orig[::10,:,:]
+Y = targets_orig[::10,:,np.newaxis]
 X_tensor = torch.from_numpy(X).to(DEVICE)
 Y_tensor = torch.from_numpy(Y).to(DEVICE)
 with torch.no_grad():

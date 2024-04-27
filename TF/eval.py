@@ -102,7 +102,7 @@ inputs = np.hstack([inputs, inputs[:, -SIMULATION_OVER_STEPS:]])
 time_window_size = inputs_shiffed.shape[1]
 
 val_idx = np.linspace(0,35,6,dtype=int)
-train_idx = [i for i in np.arange(0,36) if i not in val_idx]
+train_idx = [i for i in np.arange(0,36) ]
 
 inputs_shiffed_all = inputs_shiffed
 inputs_all = inputs[train_idx,:,:]
@@ -143,10 +143,11 @@ print(weights)
 
 
 
-pred_shiffed = model.predict(inputs_shiffed)[:,:,0]
+pred_shiffed = model.predict(inputs_shiffed,batch_size=36)[:,:,0]
 # print('Model Eval [mse,mae]:', model_eval.evaluate(inputs_shiffed[:,:-SIMULATION_OVER_STEPS,:], target_shiffed))
 
 # pred = model.predict(inputs)
+print("We did it!")
 pred = np.full((inputs.shape[0],inputs.shape[1]), np.nan)
 for i in range(pred.shape[0]):
     pred[i, :(reach_EOD[i]+SIMULATION_OVER_STEPS)] = pred_shiffed[i, (max_size - reach_EOD[i]):]
@@ -164,17 +165,17 @@ for i in range(inputs.shape[0]):
 print("")
 print("AVG MSE:, ", mse.mean())
 
-fig = plt.figure()
+fig = plt.figure("MSE")
 plt.hist(mse)
 plt.xlabel(r'mse')
 plt.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
 
-fig = plt.figure()
+fig = plt.figure("Q_max")
 plt.hist(weights[0]*model.layers[0].cell.qMaxBASE.numpy())
 plt.xlabel(r'$q_{max}$')
 plt.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
 
-fig = plt.figure()
+fig = plt.figure("R0")
 plt.hist(weights[1]*model.layers[0].cell.RoBASE.numpy())
 plt.xlabel(r'$R_0$')
 plt.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
@@ -183,35 +184,35 @@ plt.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
 time_axis = np.arange(time_window_size) * dt
 cmap = matplotlib.cm.get_cmap('Spectral')
 
-fig = plt.figure()
+fig = plt.figure("These are actual output comparison")
 
 # plt.subplot(311)
 # for i in range(inputs.shape[0]):
 #     plt.plot(time_axis, inputs[i,:,0])
 # plt.ylabel('Current (A)')
 # plt.grid()
-
+#plt.title("This one")
 plt.subplot(211)
 for i in range(pred_shiffed.shape[0]):
-    plt.plot(time_axis[:-SIMULATION_OVER_STEPS], target_shiffed[i,:], color='gray')
+    plt.plot(time_axis[:-SIMULATION_OVER_STEPS], target_shiffed[i,:], color='red')
 for i in range(pred_shiffed.shape[0]):
     idx_end = len(time_axis)
     idx = np.argwhere(pred_shiffed[i,:]<EOD)
     if len(idx):
         idx_end = idx[0][0]
-    plt.plot(time_axis[:idx_end], pred_shiffed[i,:idx_end])
+    plt.plot(time_axis[:idx_end], pred_shiffed[i,:idx_end],color ='grey',linestyle='dashed')
 plt.ylabel('Voltage (V)')
 plt.grid()
 
 plt.subplot(212)
 for i in range(pred.shape[0]):
-    plt.plot(time_axis[:-SIMULATION_OVER_STEPS], target[i,:], color='gray')
+    plt.plot(time_axis[:-SIMULATION_OVER_STEPS], target[i,:], color='red')
 for i in range(pred.shape[0]):
     idx_end = len(time_axis)
     idx = np.argwhere(pred[i,:]<EOD)
     if len(idx):
         idx_end = idx[0][0]
-    plt.plot(time_axis[:idx_end], pred[i,:idx_end])
+    plt.plot(time_axis[:idx_end], pred[i,:idx_end],color ='grey',linestyle='dashed')
 plt.ylabel('Voltage (V)')
 # plt.ylim([3.0,4.2])
 plt.grid()
@@ -219,7 +220,7 @@ plt.grid()
 plt.xlabel('Time (s)')
 
 
-fig = plt.figure()
+fig = plt.figure("Voltage Ratios")
 
 plt.subplot(211)
 for i in range(pred_shiffed.shape[0]):
@@ -244,7 +245,7 @@ for row in np.argwhere(pred<EOD):
     if reach_EOD_pred[row[0]]>row[1]:
         reach_EOD_pred[row[0]]=row[1]
 
-fig = plt.figure()
+fig = plt.figure("Strange Discrepancy from Paper")
 EOD_range = [min(np.min(reach_EOD*dt),np.min(reach_EOD_pred*dt)),max(np.max(reach_EOD*dt),np.max(reach_EOD_pred*dt))]
 plt.plot(EOD_range, EOD_range, '--k')
 plt.plot(reach_EOD*dt, reach_EOD_pred*dt, '.')
@@ -292,17 +293,17 @@ for i in range(pred.shape[1]):
 
 total_samples_pts = np.sum(~np.isnan(target_all[val_idx,:].ravel()))
 
-fig = plt.figure()
-plt.fill_between(range(len(pred_ub)), pred_ub, pred_lb, facecolor='blue', alpha=0.3, label='85% CI')
+fig = plt.figure('This One has CI')
+#plt.fill_between(range(len(pred_ub)), pred_ub, pred_lb, facecolor='blue', alpha=0.3, label='85% CI')
 plt.plot(target_all[val_idx[0],0], label='Test Samples', color='black')
-plt.plot(target_all[val_idx,:].T)
+#plt.plot(target_all[val_idx,:].T)
 
 within_CI = 0
 for i in range(target_all.shape[1]):
     within = (target_all[val_idx,i]<=pred_ub[i]) & (target_all[val_idx,i]>=pred_lb[i])
     within_CI += np.sum(within)
     plt.plot(i*np.ones(np.sum(~within)), target_all[val_idx,i][~within], '+k', markersize=3)
-plt.plot(i*np.ones(np.sum(~within)), target_all[val_idx,i][~within], '+k', markersize=3, label='Pts out CI - {:.1f}%'.format((total_samples_pts - within_CI) / total_samples_pts*100))
+#plt.plot(i*np.ones(np.sum(~within)), target_all[val_idx,i][~within], '+k', markersize=3, label='Pts out CI - {:.1f}%'.format((total_samples_pts - within_CI) / total_samples_pts*100))
 
 plt.ylim([3.2,4.2])
 plt.grid()

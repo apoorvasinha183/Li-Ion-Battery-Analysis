@@ -95,7 +95,7 @@ for kfold in range(K_FOLDS):
         verbose=1,
         mode='min')
 
-    EPOCHS = 2000
+    EPOCHS = 200
 
     callbacks = [model_checkpoint_callback,reduce_lr_on_plateau,resetStateCallback()]
     history = model.fit(inputs_shiffed[train_idx,:,:], target_shiffed[train_idx,:,np.newaxis], epochs=EPOCHS, callbacks=callbacks, shuffle=False)

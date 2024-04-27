@@ -95,7 +95,7 @@ model.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-2), loss="mse", metrics=[
 model.summary()
 
 
-weight_filepath = './training/cp_mlp_save4.ckpt'
+weight_filepath = './training/cp_mlp.ckpt'
 base_model = get_model(batch_input_shape=(36,1,1), dt=dt, mlp=True, share_q_r=False)
 base_model.load_weights(weight_filepath)
 base_weights = base_model.get_weights()
@@ -112,10 +112,10 @@ R_0_base_saved = 1.0e1
 # model.set_weights(weights)
 
 # set saved mlp weights
-cell = model.layers[0].cell
-cell.MLPp.set_weights(np.load('./training/MLPp_best_weights.npy',allow_pickle=True))
-MLPn_weigths = np.load('./training/MLPn_best_weights.npy',allow_pickle=True)
-cell.MLPn.set_weights([MLPn_weigths[:1], MLPn_weigths[1]])
+#cell = model.layers[0].cell
+#cell.MLPp.set_weights(np.load('./training/MLPp_best_weights.npy',allow_pickle=True))
+#MLPn_weigths = np.load('./training/MLPn_best_weights.npy',allow_pickle=True)
+#cell.MLPn.set_weights([MLPn_weigths[:1], MLPn_weigths[1]])
 
 
 checkpoint_filepath = './training/cp_mlp_rw_discharge_single.ckpt'

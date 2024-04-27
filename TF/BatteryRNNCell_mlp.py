@@ -179,7 +179,7 @@ class BatteryRNNCell(Layer):
         next_states = self.getNextState(states,inputs,training)
 
         output = self.getNextOutput(next_states,inputs,training)
-
+        #print("The output shape is ", output.shape)
         return output, [next_states]
 
     def getAparams(self):

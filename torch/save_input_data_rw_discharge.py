@@ -14,7 +14,7 @@ BATTERY_NUM = 3
 num_batteries = 8
 num_seq = 10
 
-# data_RW = {BATTERY_NUM: data_RW[BATTERY_NUM]} # only battery 3
+data_RW = {BATTERY_NUM: data_RW[BATTERY_NUM]} # only battery 3
 
 max_size = 0
 inputs = []
@@ -65,5 +65,5 @@ print('inputs.shape:', inputs.shape)
 # target = target[::3,:]
 # inputs_time = inputs_time[::3,:]
 
-# np.save('./training/input_data_rw_disc_batt_{}.npy'.format(BATTERY_NUM), {'inputs':inputs, 'target':target, 'time':inputs_time})
+#np.save('./training/input_data_rw_disc_batt_{}.npy'.format(BATTERY_NUM), {'inputs':inputs, 'target':target, 'time':inputs_time})
 np.save('./training/input_data_rw_disc_batt_1to8.npy', {'inputs':inputs, 'target':target, 'time':inputs_time})

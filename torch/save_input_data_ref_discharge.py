@@ -61,5 +61,5 @@ BATCH_SIZE = inputs.shape[0]
 
 print('inputs.shape:', inputs.shape)
 
-# np.save('./training/input_data_refer_disc_batt_{}.npy'.format(BATTERY_NUM), {'inputs':inputs, 'target':target, 'time':inputs_time})
+np.save('./training/input_data_refer_disc_batt_{}.npy'.format(BATTERY_NUM), {'inputs':inputs, 'target':target, 'time':inputs_time})
 np.save('./training/input_data_refer_disc_batt_1to8.npy', {'inputs':inputs, 'target':target, 'time':inputs_time, 'sizes': size_all, 'init_time': times_all})

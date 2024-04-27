@@ -123,6 +123,6 @@ EPOCHS = 5000
 callbacks = [model_checkpoint_callback,reduce_lr_on_plateau]
 # callbacks = []
 
-history = model.fit(inputs_shiffed, target_shiffed[:,:,np.newaxis], epochs=EPOCHS, callbacks=callbacks, shuffle=False)
+history = model.fit(inputs_shiffed, target_shiffed[:,:,np.newaxis], epochs=EPOCHS, callbacks=callbacks, shuffle=False,batch_size = BATCH_SIZE)
 
 np.save('./training/history_mlp_MIX_discharge_batt_1to8.npy', history.history)

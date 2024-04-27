@@ -64,11 +64,11 @@ for row in np.argwhere((target<EOD) | (np.isnan(target))):
         target_shiffed[row[0]][time_window_size-row[1]:] = target[row[0]][:row[1]]
 
 #TRAIN-TEST SPLIT
-val_idx = np.linspace(0,35,6,dtype=int)
+val_idx = np.linspace(100,120,6,dtype=int)
 train_idx = [i for i in np.arange(0,36) if i not in val_idx]
-
+print("train idx has ",len(train_idx))
 time_window_size = inputs.shape[1]  # 310
-
+print("What i want for christmas is ",inputs[train_idx,:,:].shape[0],time_window_size,inputs.shape[2])
 # Assume get code is 
 model = get_model(batch_input_shape=(inputs[train_idx,:,:].shape[0],time_window_size,inputs.shape[2]), dt=dt, mlp=True, share_q_r=False, stateful=True)
 
@@ -111,12 +111,13 @@ EPOCHS = 1000
 
 
 callbacks = [model_checkpoint_callback,resetStateCallback()]
-
+print("inputs shifted has size ",inputs_shiffed.shape)
+print("Target shiffed has size ",target_shiffed.shape)
 BLOCK = False
 if not BLOCK:
     start = time()
     
-    history = model.fit(inputs_shiffed[train_idx,:,:], target_shiffed[train_idx,:,np.newaxis], epochs=EPOCHS, callbacks=callbacks, shuffle=False)
+    history = model.fit(inputs_shiffed[train_idx,:,:], target_shiffed[train_idx,:,np.newaxis], epochs=EPOCHS, callbacks=callbacks, shuffle=False,batch_size=36)
     duration = time() - start
     print("Train time: {:.2f} s - {:.3f} s/epoch ".format(duration, duration/EPOCHS))
 

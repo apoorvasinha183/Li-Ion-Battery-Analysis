@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 
 from model import get_model
-
+# TODO : This is the Random walk discharge tracking!
 # from battery_data import getDischargeMultipleBatteries
 
 DTYPE = 'float64'
@@ -105,8 +105,8 @@ for row in np.argwhere((target<EOD) | (np.isnan(target))):
 # change background scales
 q_max_base = 1.0e5
 R_0_base = 1.0e1
-
-model = get_model(batch_input_shape=(BATCH_SIZE,time_window_size,inputs.shape[2]), dt=dt, mlp=True, mlp_trainable=False, share_q_r=False, q_max_base=q_max_base, R_0_base=R_0_base)
+#TODO : The mlp weights are frozen! I am setting it trainable just for now
+model = get_model(batch_input_shape=(BATCH_SIZE,time_window_size,inputs.shape[2]), dt=dt, mlp=True, mlp_trainable=True, share_q_r=False, q_max_base=q_max_base, R_0_base=R_0_base)
 model.compile(optimizer=tf.keras.optimizers.Adam(lr=5e-3), loss="mse", metrics=["mae"])
 
 model.summary()
@@ -129,10 +129,11 @@ model.summary()
 # model.set_weights(weights)
 
 # set saved mlp weights
-cell = model.layers[0].cell
-cell.MLPp.set_weights(np.load('./training/MLPp_best_weights.npy',allow_pickle=True))
-MLPn_weigths = np.load('./training/MLPn_best_weights.npy',allow_pickle=True)
-cell.MLPn.set_weights([MLPn_weigths[:1], MLPn_weigths[1]])
+#TODO: Cold start
+#cell = model.layers[0].cell
+#cell.MLPp.set_weights(np.load('./training/MLPp_best_weights.npy',allow_pickle=True))
+#MLPn_weigths = np.load('./training/MLPn_best_weights.npy',allow_pickle=True)
+#cell.MLPn.set_weights([MLPn_weigths[:1], MLPn_weigths[1]])
 
 
 checkpoint_filepath = './training/cp_mlp_rw_discharge_batt_{}.ckpt'.format(BATTERY_NUM)
