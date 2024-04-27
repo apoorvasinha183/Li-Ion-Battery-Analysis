@@ -70,7 +70,7 @@ class BatteryRNNCell(nn.Module):
 
         for param in self.MLPn.parameters():
             param.to(DEVICE)
-            #param.requires_grad = False
+            param.requires_grad = False
         self.MLPn.to(DEVICE)    
 
     def initBatteryParams(self,D_trainable):

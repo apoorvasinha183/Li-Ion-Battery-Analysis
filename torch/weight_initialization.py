@@ -34,7 +34,7 @@ criterion = nn.MSELoss()
 
 # Prepare data
 X = np.linspace(0.0, 1.0, 100).reshape(-1, 1).astype(np.float32)
-Y = np.hstack([np.linspace(0.85, -0.2, 90), np.linspace(-0.25, -0.8, 10)]).reshape(-1, 1).astype(np.float32)
+Y = np.hstack([np.linspace(0.85, -0.2, 95), np.linspace(-0.25, -0.8, 5)]).reshape(-1, 1).astype(np.float32)
 
 # Convert data to PyTorch tensors
 X_tensor = torch.from_numpy(X).to(DEVICE)
@@ -42,7 +42,7 @@ Y_tensor = torch.from_numpy(Y).to(DEVICE)
 
 # Create PyTorch Dataset and DataLoader
 dataset = TensorDataset(X_tensor, Y_tensor)
-data_loader = DataLoader(dataset, batch_size=32, shuffle=True)
+data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 # Learning rate scheduler
 scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
@@ -69,7 +69,7 @@ for epoch in range(num_epochs):
         total_loss += loss.item()
 
     # Adjust learning rate using scheduler
-    scheduler.step()
+    #scheduler.step()
 
     # Print epoch statistics
     if epoch % 100 == 0:
