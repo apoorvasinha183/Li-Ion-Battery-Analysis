@@ -71,7 +71,8 @@ for row in np.argwhere((target_array<EOD) | (np.isnan(target_array))):
 #train_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 val_idx = np.linspace(0,35,6,dtype=int)
 #val_idx = np.array([0])
-train_idx = [i for i in np.arange(0,36) if i not in val_idx]
+#train_idx = [i for i in np.arange(0,36) if i not in val_idx]
+train_idx = [0]
 #train_idx = np.array([1])
 ###### FOR REFERENCE : DATA INGESTION ENDS HERE ##########
         
@@ -94,7 +95,7 @@ Y_tensor = torch.from_numpy(Y).to(DEVICE)
 
 # Create PyTorch Dataset and DataLoader
 dataset = TensorDataset(X_tensor, Y_tensor)
-data_loader = DataLoader(dataset, batch_size=30, shuffle=True)
+data_loader = DataLoader(dataset, batch_size=1, shuffle=True) #TODO : Make it 30 again
 print("I am loading ",len(data_loader))
 # Learning rate scheduler
 scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))

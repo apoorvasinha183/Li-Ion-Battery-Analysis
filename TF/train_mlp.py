@@ -81,7 +81,7 @@ model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     save_weights_only=True,
     monitor='loss',
     mode='min',
-    verbose=1,
+    verbose=0,
     save_best_only=True)
 reduce_lr_on_plateau = tf.keras.callbacks.ReduceLROnPlateau(
     monitor='loss', 
@@ -114,11 +114,20 @@ callbacks = [model_checkpoint_callback,resetStateCallback()]
 print("inputs shifted has size ",inputs_shiffed.shape)
 print("Target shiffed has size ",target_shiffed.shape)
 BLOCK = False
+weights = model.get_weights()
+print("Weights before")
+print(weights)
+print("Training start..")
 if not BLOCK:
     start = time()
     
-    history = model.fit(inputs_shiffed[train_idx,:,:], target_shiffed[train_idx,:,np.newaxis], epochs=EPOCHS, callbacks=callbacks, shuffle=False,batch_size=36)
+    history = model.fit(inputs_shiffed[train_idx,:,:], target_shiffed[train_idx,:,np.newaxis], verbose=0,epochs=EPOCHS, callbacks=callbacks, shuffle=False,batch_size=36)
     duration = time() - start
     print("Train time: {:.2f} s - {:.3f} s/epoch ".format(duration, duration/EPOCHS))
 
     np.save('./training/history_mlp.npy', history.history)
+print("Training end..")
+print("Weights after")    
+weights = model.get_weights()
+print(weights)    
+#print("Weights after")

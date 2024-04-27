@@ -1,2 +1,2 @@
-model_checkpoint_path: "cp_mlp_MIX_discharge_batt_1to8.ckpt"
-all_model_checkpoint_paths: "cp_mlp_MIX_discharge_batt_1to8.ckpt"
+model_checkpoint_path: "cp_mlp.ckpt"
+all_model_checkpoint_paths: "cp_mlp.ckpt"

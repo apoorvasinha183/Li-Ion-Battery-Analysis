@@ -248,7 +248,7 @@ def train(seed):
 
 
 # Train with different loops and evaluate
-kink_loc = [65,70,75,80,85,90,95]
+kink_loc = [85,90,95]
 #kink_loc = [50,60]
 for kinks in kink_loc:
     sweet_warmup_spot(kinks)
