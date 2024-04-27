@@ -9,6 +9,8 @@ from battery_data import getDischargeMultipleBatteries
 from model import get_model
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+NUM_CHECK = 1 
+
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
@@ -75,14 +77,14 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True, version="naive_PINN").to(DEVICE)
 optimizer = optim.Adam(mlp.parameters(), lr=2e-2)
 
-def pi_loss(Volt, Vep, Ven, Vo, Vsn, Vsp, targets):
+"""def pi_loss(Volt, Vep, Ven, Vo, Vsn, Vsp, targets):
     mse_loss = nn.MSELoss()
     targets = targets.permute(0, 2, 1)
     mse = mse_loss(Volt, targets)
-    phy_feasible_loss = (Volt - (Vep - Ven - Vo - Vsn - Vsp))**2
-    return mse + phy_feasible_loss
+    phy_feasible_loss = mse_loss(Volt, Vep - Ven - Vo - Vsn - Vsp)
+    return mse + phy_feasible_loss"""
 
-#criterion = pi_loss()
+criterion = nn.MSELoss()
 
 
 
@@ -92,8 +94,8 @@ def pi_loss(Volt, Vep, Ven, Vo, Vsn, Vsp, targets):
 X = inputs_shiffed[train_idx,:,:]
 Y = target_shiffed[train_idx,:,np.newaxis]
 # Convert data to PyTorch tensors
-X_tensor = torch.from_numpy(X).to(DEVICE)
-Y_tensor = torch.from_numpy(Y).to(DEVICE)
+X_tensor = torch.from_numpy(X).to(DEVICE).float()
+Y_tensor = torch.from_numpy(Y).to(DEVICE).float()
 
 # Create PyTorch Dataset and DataLoader
 dataset = TensorDataset(X_tensor, Y_tensor)
@@ -103,10 +105,11 @@ data_loader = DataLoader(dataset, batch_size=15, shuffle=True)
 scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
 
 # Training loop
-num_epochs = 5000
+num_epochs = 1001
 for epoch in range(num_epochs):
     mlp.train()
     total_loss = 0.0
+    
 
     for inputs, targets in data_loader:
         inputs.to(DEVICE)
@@ -116,16 +119,27 @@ for epoch in range(num_epochs):
         #     targets = targets.cuda()
 
         optimizer.zero_grad()
+        
         # Forward pass
         out = mlp(inputs)
         Volt, Vep, Ven, Vo, Vsn, Vsp = out.split(1, dim=1)
         # Compute loss
-        loss = pi_loss(Volt, Vep, Ven, Vo, Vsn, Vsp, targets)
-
+        #loss = pi_loss(Volt, Vep, Ven, Vo, Vsn, Vsp, targets)
+        loss_acc = criterion(Volt, targets)
+        loss_PI = criterion(Volt,  Vep - Ven - Vo - Vsn - Vsp)
+        print(f"Accuracy Loss: {loss_acc}")
+        print(f"Physics-Informed: {loss_PI}")
+        loss = loss_acc + loss_PI
+        
+        #print(f"Loss: {loss}")
         # Backpropagation
         loss.backward()
+
+        """for name, param in mlp.named_parameters():
+            print(f'Gradient - {name}:')
+            print(param.grad)"""
+
         optimizer.step()
-        #scheduler.step()
         total_loss += loss.item()
 
     # Adjust learning rate using scheduler
@@ -138,15 +152,27 @@ for epoch in range(num_epochs):
 # Save model weights
 torch.save(mlp.state_dict(), 'torch_train/trained_weights_PINN.pth')
 
-# Plot predictions
 mlp.eval()
+# Time for the test set
+X = inputs_array[val_idx,:,:]
+Y = target_array[val_idx,:,np.newaxis]  
+X_tensor = torch.from_numpy(X).to(DEVICE)
+Y_tensor = torch.from_numpy(Y).to(DEVICE)
 with torch.no_grad():
-    pred = mlp(X_tensor).numpy()
+    pred = mlp(X_tensor).cpu().numpy()
 
-plt.plot(X, Y, color='gray')
-plt.plot(X, pred)
+#plt.plot(X, Y, color='gray')
+print("Predictions have shape ",pred.shape)
+for i in range(NUM_CHECK):
+    plt.plot(pred[i,:,0],linestyle='dashed')
+    plt.plot(Y_tensor[i,:,0])
+plt.ylabel('Voltage(V)')
 plt.grid()
+
+plt.xlabel('Time')
+plt.savefig('figures/predictionvsreality.png')
 plt.show()
+
 
 
 

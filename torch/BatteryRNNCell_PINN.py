@@ -20,6 +20,7 @@ class BatteryRNNCell_PINN(nn.Module):
 
         self.state_size = 8
         self.output_size = 1
+        self.double()
 
         self.initBatteryParams(D_trainable)
         
@@ -80,15 +81,16 @@ class BatteryRNNCell_PINN(nn.Module):
 
         """
         # Define the NN layers for NextOutput 
-        self.lin1 = nn.Linear(17, 34)
-        self.lin2 = nn.Linear(34, 17)
+        self.lin1 = nn.Linear(17, 17)
+        #self.lin2 = nn.Linear(, 17)
         self.lin3 = nn.Linear(17, 6)
         self.TanH = nn.Tanh()
+        self.ReLU = nn.ReLU()
         self.LeakyReLU = nn.LeakyReLU()
 
         # Define the NN layers for NextState
-        self.states_lin1 = nn.Linear(26, 52)
-        self.states_lin2 = nn.Linear(52, 26)
+        self.states_lin1 = nn.Linear(26, 26)
+        #self.states_lin2 = nn.Linear(52, 26)
         self.states_lin3 = nn.Linear(26, 8)
 
 
@@ -188,10 +190,10 @@ class BatteryRNNCell_PINN(nn.Module):
 
         layer1 = self.lin1(X)
         out1 = self.LeakyReLU(layer1)
-        layer2 = self.lin2(out1)
-        out2 = self.LeakyReLU(layer2)
-        layer3 = self.lin3(out2)
-        out = self.TanH(layer3)
+        #layer2 = self.lin2(out1)
+        #out2 = self.LeakyReLU(layer2)
+        layer3 = self.lin3(out1)
+        out = self.ReLU(layer3)
 
         #print(f"Final out shape:{out.shape}")  
 
@@ -220,10 +222,10 @@ class BatteryRNNCell_PINN(nn.Module):
 
         layer1 = self.states_lin1(X)
         out1 = self.LeakyReLU(layer1)
-        layer2 = self.states_lin2(out1)
-        out2 = self.LeakyReLU(layer2)
-        layer3 = self.states_lin3(out2)
-        XNew = self.TanH(layer3)
+        #layer2 = self.states_lin2(out1)
+        #out2 = self.LeakyReLU(layer2)
+        layer3 = self.states_lin3(out1)
+        XNew = self.ReLU(layer3)
 
        
         return XNew
