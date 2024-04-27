@@ -18,6 +18,7 @@ import tensorflow_probability as tfp
 tfd = tfp.distributions
 
 class BatteryRNNCell(Layer):
+
     def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, batch_size=1, q_max_base=None, R_0_base=None, D_trainable=False, **kwargs):
         super(BatteryRNNCell, self).__init__(**kwargs)
 
@@ -361,6 +362,22 @@ class BatteryRNNCell(Layer):
 
         # tf.print('Initial state:', initial_state[:,4:])
         return initial_state
+    def get_config(self):
+        config = {
+            'q_max_model': tf.keras.utils.serialize_keras_object(self.q_max_model),
+            'R_0_model': tf.keras.utils.serialize_keras_object(self.R_0_model),
+            'curr_cum_pwh': self.curr_cum_pwh,
+            'initial_state': self.initial_state,
+            'dt': self.dt,
+            'qMobile': self.qMobile,
+            'mlp_trainable': self.mlp_trainable,
+            'batch_size': self.batch_size,
+            'q_max_base': self.q_max_base,
+            'R_0_base': self.R_0_base,
+            'D_trainable': self.D_trainable
+        }
+        base_config = super(BatteryRNNCell, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
 if __name__ == "__main__":
     # Test RNN baterry cell
