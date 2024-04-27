@@ -10,7 +10,7 @@ import time
 #from BatteryRNNCell_mlp import BatteryRNN
 from model import get_model
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-NUM_CHECK = 2
+NUM_CHECK = 1
 class MLP(nn.Module):
     def __init__(self):
         super(MLP, self).__init__()
@@ -182,7 +182,7 @@ def train(seed):
     print("UnTrained Parameter Value:", untrained_parameter_value)
     # Training loop
     start = time.time()
-    num_epochs1 = 1001
+    num_epochs1 = 2001
     loss_warm_start = []
     for epoch in range(num_epochs1):
         #print("This is epoch number ",epoch)
@@ -248,7 +248,7 @@ def train(seed):
 
 
 # Train with different loops and evaluate
-kink_loc = [85,90,95]
+kink_loc = [65,70,75,80,85,90,95]
 #kink_loc = [50,60]
 for kinks in kink_loc:
     sweet_warmup_spot(kinks)
