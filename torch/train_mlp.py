@@ -10,9 +10,10 @@ import time
 from model import get_model
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE =torch.device("cpu")
-EXPERIMENT = False #Compares and plots watm-start vs random initialization
+EXPERIMENT = True #Compares and plots watm-start vs random initialization
 NUM_EPOCHS = 1001
 NUM_CHECK = 1 # Between 1 and 6 .How many batteries do you want to evaluate
+Validate = False
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
@@ -41,7 +42,7 @@ def get_data_tensor(data_dict, max_idx_to_use, max_size):
 
 # Load battery data
 data_RW = getDischargeMultipleBatteries()
-max_idx_to_use = 36 # We are training the battery with constamt current data #This is to force nly one battery data
+max_idx_to_use = 3 # We are training the battery with constamt current data #This is to force nly one battery data
 max_size = np.max([v[0, 0].shape[0] for k, v in data_RW.items()])
 dt = np.diff(data_RW[1][2, 0])[1]
 # Get data tensors
@@ -80,7 +81,7 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
         
 # Create the MLP model, optimizer, and criterion
 mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
-optimizer = optim.Adam(mlp.parameters(), lr=2e-2)
+optimizer = optim.Adam(mlp.parameters(), lr=5e-3)
 criterion = nn.MSELoss().to(DEVICE)
 param_count = sum(p.numel() for p in mlp.parameters() if p.requires_grad)
 print("Total number of trainable parameters are ",param_count)
@@ -98,7 +99,7 @@ dataset = TensorDataset(X_tensor, Y_tensor)
 data_loader = DataLoader(dataset, batch_size=30, shuffle=True) #TODO : Make it 30 again
 print("I am loading ",len(data_loader))
 # Learning rate scheduler
-scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 800 else (0.5 if epoch < 1100 else (0.25 if epoch < 2200 else 0.125)))
+#scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 800 else (0.5 if epoch < 1100 else (0.25 if epoch < 2200 else 0.125)))
 untrained_parameter_value = [mlp.cell.qMax.data.item(),mlp.cell.Ro.data.item()]
 print("UnTrained Parameter Value:", untrained_parameter_value)
 # Training loop
@@ -132,7 +133,7 @@ for epoch in range(num_epochs):
         total_loss += loss.item()
 
     # Adjust learning rate using scheduler
-    scheduler.step()   
+    #scheduler.step()   
 
     # Print epoch statistics
     if epoch % 100 == 0:
@@ -214,7 +215,7 @@ if EXPERIMENT:
             total_loss += loss.item()
 
         # Adjust learning rate using scheduler
-        scheduler.step()
+        #scheduler.step()
 
         # Print epoch statistics
         if epoch % 100 == 0:
@@ -229,34 +230,35 @@ if EXPERIMENT:
 
     plt.xlabel('Epoch(unit of 100)')
     plt.savefig('figures/trainingtrend.png')
-    #plt.show()
+    plt.show()
 ###### This is a small experiment comparing warm_start with random start ########
     
 ######## Validation is done here ##########
-mlp.eval()
-# Time for the test set
-X = inputs_shiffed[val_idx,:,:]
-# For confidential reasons
-shape_X = np.shape(X)
-print(shape_X)
+if Validate:
+    mlp.eval()
+    # Time for the test set
+    X = inputs_shiffed[val_idx,:,:]
+    # For confidential reasons
+    shape_X = np.shape(X)
+    print(shape_X)
 
-Y = target_shiffed[val_idx,:,np.newaxis]  
-X_tensor = torch.from_numpy(X).to(DEVICE)
-Y_tensor = torch.from_numpy(Y).to(DEVICE)
-with torch.no_grad():
-    pred = mlp(X_tensor).cpu().numpy()
+    Y = target_shiffed[val_idx,:,np.newaxis]  
+    X_tensor = torch.from_numpy(X).to(DEVICE)
+    Y_tensor = torch.from_numpy(Y).to(DEVICE)
+    with torch.no_grad():
+        pred = mlp(X_tensor).cpu().numpy()
 
-#plt.plot(X, Y, color='gray')
-print("Predictions have shape ",pred.shape)
-for i in range(NUM_CHECK):
-    plt.plot(pred[i,:,0],linestyle='dashed')
-    plt.plot(Y_tensor[i,:,0])
-plt.ylabel('Voltage(V)')
-plt.grid()
+    #plt.plot(X, Y, color='gray')
+    print("Predictions have shape ",pred.shape)
+    for i in range(NUM_CHECK):
+        plt.plot(pred[i,:,0],linestyle='dashed')
+        plt.plot(Y_tensor[i,:,0])
+    plt.ylabel('Voltage(V)')
+    plt.grid()
 
-plt.xlabel('Time')
-plt.savefig('figures/predictionvsreality.png')
-#plt.show()
+    plt.xlabel('Time')
+    plt.savefig('figures/predictionvsreality.png')
+    plt.show()
 
 ######## Validation is done here ##########
 
