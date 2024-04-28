@@ -241,13 +241,14 @@ class BatteryRNNCell(nn.Module):
         return XNew
 
     def get_initial_state(self):
-        self.initBatteryParams(D_trainable=False)
-        if self.q_max_model is not None:
-            self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh).to(DEVICE)) / self.qMaxBASE
+        ##### PAIN LIVES HERE #####
+        #self.initBatteryParams(D_trainable=False)
+        #if self.q_max_model is not None:
+        #    self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh).to(DEVICE)) / self.qMaxBASE
         
-        if self.R_0_model is not None:
-            self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh).to(DEVICE)) / self.RoBASE
-        
+        #if self.R_0_model is not None:
+        #    self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh).to(DEVICE)) / self.RoBASE
+        #### PAIN LIVES ABOVE #######
         qpMin = self.qMax * self.qMaxBASE * self.xpMin
         qpSMin = qpMin * self.VolS / self.Vol
         qpBMin = qpMin * self.VolB / self.Vol

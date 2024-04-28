@@ -45,7 +45,7 @@ def sweet_warmup_spot(knee):
 
     # Create PyTorch Dataset and DataLoader
     dataset = TensorDataset(X_tensor, Y_tensor)
-    data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+    data_loader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     # Learning rate scheduler
     #scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
@@ -75,7 +75,7 @@ def sweet_warmup_spot(knee):
         #scheduler.step()
 
         # Print epoch statistics
-        if epoch0 % 100 == 0:
+        if epoch0 % 1000 == 0:
             print(f"Epoch {epoch0}, Loss: {total_loss / len(data_loader)}")
 
     # Save model weights
@@ -121,7 +121,7 @@ def train(seed):
 
     # Load battery data
     data_RW = getDischargeMultipleBatteries()
-    max_idx_to_use = 3 # We are training the battery with constamt current data
+    max_idx_to_use = 36 # We are training the battery with constamt current data
     max_size = np.max([v[0, 0].shape[0] for k, v in data_RW.items()])
     dt = np.diff(data_RW[1][2, 0])[1]
     # Get data tensors
@@ -177,12 +177,12 @@ def train(seed):
     data_loader = DataLoader(dataset, batch_size=30, shuffle=True)
     print("I am loading ",len(data_loader))
     # Learning rate scheduler
-    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
+    #scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
     untrained_parameter_value = [mlp.cell.MLPp[1].weight.data,mlp.cell.Ro.data.item()]
     print("UnTrained Parameter Value:", untrained_parameter_value)
     # Training loop
     start = time.time()
-    num_epochs1 = 2001
+    num_epochs1 = 501
     loss_warm_start = []
     for epoch in range(num_epochs1):
         #print("This is epoch number ",epoch)
@@ -244,15 +244,17 @@ def train(seed):
     with torch.no_grad():
         pred = mlp(X_tensor).cpu().numpy()
 
-    return X_tensor,Y_tensor,pred
+    return X_tensor,Y_tensor,pred,total_loss
 
 
 # Train with different loops and evaluate
-kink_loc = [85,90,95]
+kink_loc = [65,75,85,90,95]
+loss_matrix = []
 #kink_loc = [50,60]
 for kinks in kink_loc:
     sweet_warmup_spot(kinks)
-    input,output,prediction = train(kinks)
+    input,output,prediction,total_loss = train(kinks)
+    loss_matrix.append(total_loss)
     # Eval
     for i in range(NUM_CHECK):
         plt.plot(prediction[i,:,0],linestyle='dashed',label =str(kinks)+"Battery "+str(i))
@@ -263,4 +265,8 @@ plt.legend()
 
 plt.xlabel('Time')
 plt.savefig('figures/predictionvsrealitydifferentwarmups.png')
-plt.show()
+#plt.show()
+loss_matrix = np.array(loss_matrix)
+right_kink = np.argmin(loss_matrix)
+that_one = kink_loc[right_kink]
+sweet_warmup_spot(that_one)

@@ -81,11 +81,11 @@ model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     save_weights_only=True,
     monitor='loss',
     mode='min',
-    verbose=0,
+    verbose=1,
     save_best_only=True)
 reduce_lr_on_plateau = tf.keras.callbacks.ReduceLROnPlateau(
     monitor='loss', 
-    factor=0.9999999999, 
+    factor=0.5, 
     min_lr=1e-6, 
     patience=25,
     min_delta=1e-10,
@@ -121,7 +121,7 @@ print("Training start..")
 if not BLOCK:
     start = time()
     
-    history = model.fit(inputs_shiffed[train_idx,:,:], target_shiffed[train_idx,:,np.newaxis], verbose=0,epochs=EPOCHS, callbacks=callbacks, shuffle=False,batch_size=36)
+    history = model.fit(inputs_shiffed[train_idx,:,:], target_shiffed[train_idx,:,np.newaxis],epochs=EPOCHS, callbacks=callbacks, shuffle=False,batch_size=36)
     duration = time() - start
     print("Train time: {:.2f} s - {:.3f} s/epoch ".format(duration, duration/EPOCHS))
 
