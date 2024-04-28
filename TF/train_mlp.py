@@ -4,7 +4,7 @@ from time import time
 import matplotlib
 import matplotlib.pyplot as plt
 import tensorflow as tf
-
+import sys
 from model import get_model
 
 from battery_data import getDischargeMultipleBatteries
@@ -25,7 +25,10 @@ max_idx_to_use = 3
 max_size = np.max([ v[0,0].shape[0] for k,v in data_RW.items() ])
 
 dt = np.diff(data_RW[1][2,0])[1]
-
+#print("Time step is ",data_RW[1][2,0])
+for keys in data_RW:
+    print(keys)
+sys.exit()
 inputs = None
 target = None
 #TODO : Readout the dataset

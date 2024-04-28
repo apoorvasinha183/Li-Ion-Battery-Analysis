@@ -11,7 +11,7 @@ from model import get_model
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE =torch.device("cpu")
 EXPERIMENT = False #Compares and plots watm-start vs random initialization
-NUM_EPOCHS = 1001
+NUM_EPOCHS = 3001
 NUM_CHECK = 1 # Between 1 and 6 .How many batteries do you want to evaluate
 Validate = True
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
