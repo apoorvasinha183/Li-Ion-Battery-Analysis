@@ -126,7 +126,7 @@ for epoch in range(num_epochs):
 
         # Backpropagation
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0) #TODO: This sets gradient clipping
+        # torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0) #TODO: This sets gradient clipping
         optimizer.step()
         #scheduler.step()
         total_loss += loss.item()

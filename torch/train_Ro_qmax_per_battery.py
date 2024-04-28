@@ -12,37 +12,36 @@ from model import get_model
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE = torch.device("cpu")
 NUM_EPOCHS = 1000
+BATTERY = 1
 
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 data_RW = getDischargeMultipleBatteries(varnames=['voltage', 'current', 'time'], discharge_type='discharge (random walk)')
 
 max_size = 0
-num_seq = 4
+num_seq = 36
 
 inputs = []
 inputs_time = []
 target = []
-for k,rw_data in data_RW.items():
-    # skip batteries RW 9 to 12 for now (RW does not got to EOD)
-    if k>8:
-        continue
-    # rw_data = data_RW[1]
-    time_ = np.hstack([rw_data[2][i] for i in range(len(rw_data[2]))])
-    time_ = time_ - time_[0]
-    current_inputs = np.hstack([rw_data[1][i] for i in range(len(rw_data[1]))])
-    voltage_target = np.hstack([rw_data[0][i] for i in range(len(rw_data[0]))])
 
-    last_idx = 0
-    seq_durations = np.diff([0]+list(np.argwhere(np.diff(time_)>10)[:,0]+1))
-    
-    for curr_duration in seq_durations[:num_seq]:
-        if curr_duration>max_size:
-            max_size = curr_duration
-        curr_idx = last_idx + curr_duration
-        inputs.append(current_inputs[last_idx:curr_idx])
-        inputs_time.append(time_[last_idx:curr_idx])
-        target.append(voltage_target[last_idx:curr_idx])
-        last_idx = curr_idx
+
+rw_data = data_RW[BATTERY]
+time_ = np.hstack([rw_data[2][i] for i in range(len(rw_data[2]))])
+time_ = time_ - time_[0]
+current_inputs = np.hstack([rw_data[1][i] for i in range(len(rw_data[1]))])
+voltage_target = np.hstack([rw_data[0][i] for i in range(len(rw_data[0]))])
+
+last_idx = 0
+seq_durations = np.diff([0]+list(np.argwhere(np.diff(time_)>10)[:,0]+1))
+
+for curr_duration in seq_durations[:num_seq]:
+    if curr_duration>max_size:
+        max_size = curr_duration
+    curr_idx = last_idx + curr_duration
+    inputs.append(current_inputs[last_idx:curr_idx])
+    inputs_time.append(time_[last_idx:curr_idx])
+    target.append(voltage_target[last_idx:curr_idx])
+    last_idx = curr_idx
 
 # add nan to end of seq to have all seq in same size
 for i in range(len(inputs)):
@@ -81,8 +80,8 @@ for row in np.argwhere((target<EOD) | (np.isnan(target))):
         target_shiffed[row[0]] = np.ones(time_window_size) * target[row[0]][0]
         target_shiffed[row[0]][time_window_size-row_1:] = target[row[0]][:row_1]
 
-val_idx = np.linspace(0,31,6,dtype=int)
-train_idx = [i for i in np.arange(0,32) if i not in val_idx]
+val_idx = np.linspace(0,35,6,dtype=int)
+train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 ###### FOR REFERENCE : DATA INGESTION ENDS HERE ##########
 
 
@@ -93,7 +92,6 @@ train_idx = [i for i in np.arange(0,32) if i not in val_idx]
         
 # Create the MLP model, optimizer, and criterion
 mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
-
 
 # load trained weights for MLPp
 weights_path = 'torch_train/mlp_trained_weights.pth'
@@ -111,14 +109,11 @@ with torch.no_grad():
 for param in mlp.cell.MLPp.parameters():
     param.requires_grad = False
 
-
 optimizer = optim.Adam(mlp.parameters(), lr=5e-3)
 criterion = nn.MSELoss().to(DEVICE)
 param_count = sum(p.numel() for p in mlp.parameters() if p.requires_grad)
 print("Total number of trainable parameters are ",param_count)
 # Prepare data
-#X = np.linspace(0.0, 1.0, 100).reshape(-1, 1).astype(np.float32)
-#Y = np.hstack([np.linspace(0.85, -0.2, 90), np.linspace(-0.25, -0.8, 10)]).reshape(-1, 1).astype(np.float32)
 X = inputs_shiffed[train_idx,:,:]
 Y = target_shiffed[train_idx,:, np.newaxis]
 # Convert data to PyTorch tensors
@@ -155,7 +150,7 @@ for epoch in range(num_epochs):
 
         # Backpropagation
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0) #TODO: This sets gradient clipping
+        # torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0) #TODO: This sets gradient clipping
         optimizer.step()
         #scheduler.step()
         total_loss += loss.item()
@@ -171,7 +166,73 @@ for epoch in range(num_epochs):
             print("Current Learning Rate:", current_learning_rate)
 
 # Save model weights
-torch.save(mlp.state_dict(), 'torch_train/Ro_qmax_trained_weights.pth')
+torch.save(mlp.state_dict(), 'torch_train/Ro_qmax_trained_weights_battery_{BATTERY}.pth')
 trained_parameter_value = [mlp.cell.Ro.data.item(), mlp.cell.qMax.data.item()]
 print("Trained Parameter Value:", trained_parameter_value)
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
+
+
+######## Validation is done here ##########
+mlp.eval()
+# Time for the test set
+X = inputs[val_idx,:,:]
+Y = target[val_idx,:, np.newaxis]
+X_tensor = torch.from_numpy(X).to(DEVICE)
+Y_tensor = torch.from_numpy(Y).to(DEVICE)
+with torch.no_grad():
+    pred = mlp(X_tensor).cpu().numpy()
+
+#plt.plot(X, Y, color='gray')
+print("Predictions have shape ",pred.shape)
+for i in range(X.shape[0]):
+    fig = plt.figure(figsize=(10, 5))
+    ax1 = fig.add_subplot(111)
+    ax1.set_xlabel('time')
+    ax1.set_ylabel('Voltage [V]')
+    ax2 = ax1.twinx()
+    ax1.plot(pred[i,:,0], linestyle='dashed', color='red', label='Voltage Prediction')
+    ax1.plot(Y_tensor[i,:,0], color='blue', label='Voltage Measured')
+    ax1.legend()
+    ax2.plot(X_tensor[i,:,0], color='purple', label='Current Measured', alpha=0.5)
+    ax2.legend()
+    ax2.set_ylabel('Current [I]')
+    ax2.yaxis.label.set_color('purple')
+    ax2.spines["right"].set_edgecolor('purple')
+    ax2.tick_params(axis='y', colors='purple')
+
+    plt.savefig(f'figures/predictionvsreality_random_walk_unshiffed{i}_Ro_qMax_battery_{BATTERY}.png')
+    # plt.show()
+######## Validation is done here ##########
+
+
+######## Validation is done here ##########
+mlp.eval()
+# Time for the test set
+X = inputs_shiffed[val_idx,:,:]
+Y = target_shiffed[val_idx,:,np.newaxis]
+X_tensor = torch.from_numpy(X).to(DEVICE)
+Y_tensor = torch.from_numpy(Y).to(DEVICE)
+with torch.no_grad():
+    pred = mlp(X_tensor).cpu().numpy()
+
+#plt.plot(X, Y, color='gray')
+print("Predictions have shape ",pred.shape)
+for i in range(X.shape[0]):
+    fig = plt.figure(figsize=(10, 5))
+    ax1 = fig.add_subplot(111)
+    ax1.set_xlabel('time')
+    ax1.set_ylabel('Voltage [V]')
+    ax2 = ax1.twinx()
+    ax1.plot(pred[i,:,0], linestyle='dashed', color='red', label='Voltage Prediction')
+    ax1.plot(Y_tensor[i,:,0], color='blue', label='Voltage Measured')
+    ax1.legend()
+    ax2.plot(X_tensor[i,:,0], color='purple', label='Current Measured', alpha=0.5)
+    ax2.legend()
+    ax2.set_ylabel('Current [I]')
+    ax2.yaxis.label.set_color('purple')
+    ax2.spines["right"].set_edgecolor('purple')
+    ax2.tick_params(axis='y', colors='purple')
+
+    plt.savefig(f'figures/predictionvsreality_random_walk_shiffed{i}_Ro_qMax_battery_{BATTERY}.png')
+    # plt.show()
+######## Validation is done here ##########
