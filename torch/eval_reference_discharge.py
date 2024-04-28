@@ -78,14 +78,20 @@ weights_path = 'torch_train/mlp_trained_weights.pth'
 mlp_p_weights = torch.load(weights_path)
 
 with torch.no_grad():
-    mlp.cell.qMax.copy_(mlp_p_weights['cell.qMax']) 
-    mlp.cell.Ro.copy_(mlp_p_weights['cell.Ro']) 
     mlp.cell.MLPp[1].weight.copy_(mlp_p_weights["cell.MLPp.1.weight"])
     mlp.cell.MLPp[1].bias.copy_(mlp_p_weights['cell.MLPp.1.bias'])
     mlp.cell.MLPp[3].weight.copy_(mlp_p_weights['cell.MLPp.3.weight'])
     mlp.cell.MLPp[3].bias.copy_(mlp_p_weights['cell.MLPp.3.bias'])
     mlp.cell.MLPp[5].weight.copy_(mlp_p_weights['cell.MLPp.5.weight'])
     mlp.cell.MLPp[5].bias.copy_(mlp_p_weights['cell.MLPp.5.bias'])
+
+    
+Ro_qmax_path ='torch_train/Ro_qmax_trained_weights.pth'
+Ro_qmax = torch.load(weights_path)
+
+with torch.no_grad():
+    mlp.cell.qMax.copy_(Ro_qmax['cell.qMax']) 
+    mlp.cell.Ro.copy_(Ro_qmax['cell.Ro']) 
 
 ###### FOR REFERENCE : MODEL LOADING ENDS HERE ##########
 

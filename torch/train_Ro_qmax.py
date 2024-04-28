@@ -81,7 +81,7 @@ for row in np.argwhere((target<EOD) | (np.isnan(target))):
         target_shiffed[row[0]] = np.ones(time_window_size) * target[row[0]][0]
         target_shiffed[row[0]][time_window_size-row_1:] = target[row[0]][:row_1]
 
-val_idx = np.linspace(0,32,6,dtype=int)
+val_idx = np.linspace(0,31,6,dtype=int)
 train_idx = [i for i in np.arange(0,32) if i not in val_idx]
 ###### FOR REFERENCE : DATA INGESTION ENDS HERE ##########
 
@@ -112,7 +112,7 @@ for param in mlp.cell.MLPp.parameters():
     param.requires_grad = False
 
 
-optimizer = optim.Adam(mlp.parameters(), lr=2e-2)
+optimizer = optim.Adam(mlp.parameters(), lr=5e-3)
 criterion = nn.MSELoss().to(DEVICE)
 param_count = sum(p.numel() for p in mlp.parameters() if p.requires_grad)
 print("Total number of trainable parameters are ",param_count)
@@ -130,7 +130,8 @@ dataset = TensorDataset(X_tensor, Y_tensor)
 data_loader = DataLoader(dataset, batch_size=30, shuffle=True)
 print("I am loading ",len(data_loader))
 # Learning rate scheduler
-scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
+scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 800 else (0.5 if epoch < 1100 else (0.25 if epoch < 2200 else 0.125)))
+# scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
 untrained_parameter_value = [mlp.cell.Ro.data.item(), mlp.cell.qMax.data.item()]
 print("UnTrained Parameter Value:", untrained_parameter_value)
 # Training loop
@@ -154,6 +155,7 @@ for epoch in range(num_epochs):
 
         # Backpropagation
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0) #TODO: This sets gradient clipping
         optimizer.step()
         #scheduler.step()
         total_loss += loss.item()
@@ -164,9 +166,12 @@ for epoch in range(num_epochs):
     if epoch % 100 == 0:
         loss_warm_start.append(total_loss / len(data_loader))
         print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}, Time : {time.time()-start}, Ro: {mlp.cell.Ro.data.item()}, qMax: {mlp.cell.qMax.data.item()}")
+        for param_group in optimizer.param_groups:
+            current_learning_rate = param_group['lr']
+            print("Current Learning Rate:", current_learning_rate)
 
 # Save model weights
-torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
+torch.save(mlp.state_dict(), 'torch_train/Ro_qmax_trained_weights.pth')
 trained_parameter_value = [mlp.cell.Ro.data.item(), mlp.cell.qMax.data.item()]
 print("Trained Parameter Value:", trained_parameter_value)
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
