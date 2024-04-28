@@ -12,7 +12,7 @@ from model import get_model
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE = torch.device("cpu")
 NUM_EPOCHS = 1000
-BATTERY = 1
+BATTERY = 2
 
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 data_RW = getDischargeMultipleBatteries(varnames=['voltage', 'current', 'time'], discharge_type='discharge (random walk)')
@@ -91,23 +91,10 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
         
 # Create the MLP model, optimizer, and criterion
-mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
+mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True,mlp_trainable=False).to(DEVICE)
 
-# load trained weights for MLPp
-weights_path = 'torch_train/mlp_trained_weights.pth'
-mlp_p_weights = torch.load(weights_path)
+# load trained weights for MLPp <-- Happens 
 
-with torch.no_grad():
-    mlp.cell.MLPp[1].weight.copy_(mlp_p_weights["cell.MLPp.1.weight"])
-    mlp.cell.MLPp[1].bias.copy_(mlp_p_weights['cell.MLPp.1.bias'])
-    mlp.cell.MLPp[3].weight.copy_(mlp_p_weights['cell.MLPp.3.weight'])
-    mlp.cell.MLPp[3].bias.copy_(mlp_p_weights['cell.MLPp.3.bias'])
-    mlp.cell.MLPp[5].weight.copy_(mlp_p_weights['cell.MLPp.5.weight'])
-    mlp.cell.MLPp[5].bias.copy_(mlp_p_weights['cell.MLPp.5.bias'])
-
-# freeze MLPp
-for param in mlp.cell.MLPp.parameters():
-    param.requires_grad = False
 
 optimizer = optim.Adam(mlp.parameters(), lr=5e-3)
 criterion = nn.MSELoss().to(DEVICE)
@@ -201,7 +188,7 @@ for i in range(X.shape[0]):
     ax2.tick_params(axis='y', colors='purple')
 
     plt.savefig(f'figures/predictionvsreality_random_walk_unshiffed{i}_Ro_qMax_battery_{BATTERY}.png')
-    # plt.show()
+    plt.show()
 ######## Validation is done here ##########
 
 
@@ -234,5 +221,5 @@ for i in range(X.shape[0]):
     ax2.tick_params(axis='y', colors='purple')
 
     plt.savefig(f'figures/predictionvsreality_random_walk_shiffed{i}_Ro_qMax_battery_{BATTERY}.png')
-    # plt.show()
+    plt.show()
 ######## Validation is done here ##########

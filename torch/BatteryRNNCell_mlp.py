@@ -37,24 +37,40 @@ class BatteryRNNCell(nn.Module):
 
         # Initialize MLPp weights
         # Load the weights from the .pth file
-        weights_path = 'torch_train/mlp_initial_weights.pth'
-        mlp_p_weights = torch.load(weights_path)
-        #for keys in mlp_p_weights["model_state_dict"]:
-        #    print("keys available are ",keys)
-        #self.MLPp.load_state_dict(mlp_p_weights['model_state_dict'])
-        #self.MLPp.train()
-        self.WARM_START = WARM_START
-        if self.WARM_START:
-            with torch.no_grad():
-                # Assign weights and biases to each layer in the model
-                self.MLPp[1].weight.copy_(mlp_p_weights["model_state_dict"][ "MLPp.1.weight"])
-                self.MLPp[1].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.1.bias'])
-                self.MLPp[3].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.weight'])
-                self.MLPp[3].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.bias'])
-                self.MLPp[5].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.weight'])
-                self.MLPp[5].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.bias'])
+        if self.mlp_trainable:
+            weights_path = 'torch_train/mlp_initial_weights.pth'
+            mlp_p_weights = torch.load(weights_path)
+            #for keys in mlp_p_weights["model_state_dict"]:
+            #    print("keys available are ",keys)
+            #self.MLPp.load_state_dict(mlp_p_weights['model_state_dict'])
+            #self.MLPp.train()
+            self.WARM_START = WARM_START
+            if self.WARM_START:
+                with torch.no_grad():
+                    # Assign weights and biases to each layer in the model
+                    self.MLPp[1].weight.copy_(mlp_p_weights["model_state_dict"][ "MLPp.1.weight"])
+                    self.MLPp[1].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.1.bias'])
+                    self.MLPp[3].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.weight'])
+                    self.MLPp[3].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.bias'])
+                    self.MLPp[5].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.weight'])
+                    self.MLPp[5].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.bias'])
 
-            self.MLPp.to(DEVICE)
+                self.MLPp.to(DEVICE)
+        else:
+            weights_path = 'torch_train/mlp_trained_weights.pth'
+            mlp_p_weights = torch.load(weights_path)
+
+            with torch.no_grad():
+                self.MLPp[1].weight.copy_(mlp_p_weights["cell.MLPp.1.weight"])
+                self.MLPp[1].bias.copy_(mlp_p_weights['cell.MLPp.1.bias'])
+                self.MLPp[3].weight.copy_(mlp_p_weights['cell.MLPp.3.weight'])
+                self.MLPp[3].bias.copy_(mlp_p_weights['cell.MLPp.3.bias'])
+                self.MLPp[5].weight.copy_(mlp_p_weights['cell.MLPp.5.weight'])
+                self.MLPp[5].bias.copy_(mlp_p_weights['cell.MLPp.5.bias'])
+
+            # freeze MLPp
+            for param in self.MLPp.parameters():
+                param.requires_grad = False        
 
         X = torch.linspace(0.0, 1.0, 100).unsqueeze(1).to(DEVICE)
         Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1).to(DEVICE)
@@ -88,14 +104,14 @@ class BatteryRNNCell(nn.Module):
 
         if self.q_max_model is None:
             initial_q_max = torch.tensor(1.4e4 / self.q_max_base_value).to(DEVICE)
-            self.qMax = nn.Parameter(initial_q_max,requires_grad=not self.mlp_trainable).to(DEVICE)
+            self.qMax = nn.Parameter(initial_q_max,requires_grad=True).to(DEVICE)
         else:
             self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh)) / self.qMaxBASE
             self.qMax.to(DEVICE)
 
         if self.R_0_model is None:
             initial_R_0 = torch.tensor(0.15 / self.R_0_base_value)
-            self.Ro = nn.Parameter(initial_R_0,requires_grad=not self.mlp_trainable).to(DEVICE)
+            self.Ro = nn.Parameter(initial_R_0,requires_grad=True).to(DEVICE)
         else:
             self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh)) / self.RoBASE
             self.Ro.to(DEVICE)

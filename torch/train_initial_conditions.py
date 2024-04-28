@@ -42,7 +42,7 @@ def get_data_tensor(data_dict, max_idx_to_use, max_size):
 
 # Load battery data
 data_RW = getDischargeMultipleBatteries()
-max_idx_to_use = 3 # We are training the battery with constamt current data #This is to force nly one battery data
+max_idx_to_use = 36 # We are training the battery with constamt current data #This is to force nly one battery data
 max_size = np.max([v[0, 0].shape[0] for k, v in data_RW.items()])
 dt = np.diff(data_RW[1][2, 0])[1]
 # Get data tensors
@@ -80,7 +80,7 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
         
 # Create the MLP model, optimizer, and criterion
-mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
+mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True,mlp_trainable=False).to(DEVICE)
 optimizer = optim.Adam(mlp.parameters(), lr=5e-3)
 criterion = nn.MSELoss().to(DEVICE)
 param_count = sum(p.numel() for p in mlp.parameters() if p.requires_grad)
@@ -144,7 +144,7 @@ for epoch in range(num_epochs):
             print("Current Learning Rate:", current_learning_rate)
 
 # Save model weights
-torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
+torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights_bias_correction.pth')
 trained_parameter_value = [mlp.cell.qMax.data.item(),mlp.cell.Ro.data.item()]
 print("Trained Parameter Value:", trained_parameter_value)
 # Plot predictions
@@ -257,8 +257,8 @@ if Validate:
     plt.grid()
 
     plt.xlabel('Time')
-    plt.savefig('figures/predictionvsreality_mlp_trained.png')
-    #plt.show()
+    plt.savefig('figures/predictionvsreality_biascorrected.png')
+    plt.show()
 
 ######## Validation is done here ##########
 

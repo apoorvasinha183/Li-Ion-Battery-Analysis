@@ -1,4 +1,5 @@
 #!/bin/bash
 
-python best_warmup.py
+python weight_initialization.py
 python train_mlp.py
+python train_initial_conditions.py
