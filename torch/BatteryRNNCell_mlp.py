@@ -139,6 +139,9 @@ class BatteryRNNCell(nn.Module):
         if states is None:
             states = self.get_initial_state()
         # print("states have ")
+        max_q_max = 23000/self.q_max_base_value
+        torch.clamp(self.qMax,min =0,max=max_q_max)
+        torch.clamp(self.Ro,min=0)
         next_states = self.getNextState(states, inputs)
         # print("returned next states")
         output = self.getNextOutput(next_states, inputs)
