@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import torch.nn.init as init
+
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class BatteryRNNCell_PINN(nn.Module):
     def __init__(self, q_max_model=None, R_0_model=None, curr_cum_pwh=0.0, initial_state=None, dt=1.0, qMobile=7600, mlp_trainable=True, q_max_base=None, R_0_base=None, D_trainable=False, WARM_START = True):
@@ -21,35 +24,21 @@ class BatteryRNNCell_PINN(nn.Module):
         self.state_size = 8
         self.output_size = 1
         self.double()
+        self.mlp_trainable = mlp_trainable
 
         self.initBatteryParams(D_trainable)
         
-        # MLP's for non ideal voltage - Definition, Warm Start using constant load, Training
-        """
-        self.MLPp = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(1, 8),
-            nn.Tanh(),
-            nn.Linear(8, 4),
-            nn.Tanh(),
-            nn.Linear(4, 1)
-        )
-
-        self.MLPn = nn.Sequential(
-            nn.Linear(1, 1)
-        )
+        # Initialize MLP
 
         # Initialize MLPp weights
         # Load the weights from the .pth file
-        weights_path = 'torch_train/mlp_initial_weights.pth'
+        """
+        weights_path = 'torch_train/mlp_initial_weights_PINN.pth'
         mlp_p_weights = torch.load(weights_path)
-        #for keys in mlp_p_weights["model_state_dict"]:
-        #    print("keys available are ",keys)
-        #self.MLPp.load_state_dict(mlp_p_weights['model_state_dict'])
-        #self.MLPp.train()
 
+        # Assign weights and biases to each layer in the model
         with torch.no_grad():
-            # Assign weights and biases to each layer in the model
+            
             self.MLPp[1].weight.copy_(mlp_p_weights["model_state_dict"][ "MLPp.1.weight"])
             self.MLPp[1].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.1.bias'])
             self.MLPp[3].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.weight'])
@@ -78,20 +67,30 @@ class BatteryRNNCell_PINN(nn.Module):
         for param in self.MLPn.parameters():
             param.requires_grad = False
         self.MLPn.to(DEVICE)
+"""
 
-        """
         # Define the NN layers for NextOutput 
-        self.lin1 = nn.Linear(17, 17)
-        #self.lin2 = nn.Linear(, 17)
-        self.lin3 = nn.Linear(17, 6)
+        self.lin1 = nn.Linear(17, 34)
+        #self.lin2 = nn.Linear(34, 17)
+        self.lin3 = nn.Linear(34, 6)
+
+        init.xavier_uniform_(self.lin1.weight)
+        init.xavier_uniform_(self.lin3.weight)
+        #init.xavier_uniform_(self.lin2.weight)
+        
+
         self.TanH = nn.Tanh()
         self.ReLU = nn.ReLU()
         self.LeakyReLU = nn.LeakyReLU()
 
         # Define the NN layers for NextState
-        self.states_lin1 = nn.Linear(26, 26)
+        self.states_lin1 = nn.Linear(26, 52)
         #self.states_lin2 = nn.Linear(52, 26)
-        self.states_lin3 = nn.Linear(26, 8)
+        self.states_lin3 = nn.Linear(52, 8)
+
+        #init.xavier_uniform_(self.states_lin2.weight)
+        init.xavier_uniform_(self.states_lin1.weight)
+        init.xavier_uniform_(self.states_lin3.weight)
 
 
 
@@ -111,14 +110,14 @@ class BatteryRNNCell_PINN(nn.Module):
 
         if self.q_max_model is None:
             initial_q_max = torch.tensor(1.4e4 / self.q_max_base_value).to(DEVICE)
-            self.qMax = nn.Parameter(initial_q_max).to(DEVICE)
+            self.qMax = nn.Parameter(initial_q_max,requires_grad=not self.mlp_trainable).to(DEVICE)
         else:
             self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh)) / self.qMaxBASE
             self.qMax.to(DEVICE)
 
         if self.R_0_model is None:
             initial_R_0 = torch.tensor(0.15 / self.R_0_base_value)
-            self.Ro = nn.Parameter(initial_R_0).to(DEVICE)
+            self.Ro = nn.Parameter(initial_R_0,requires_grad=not self.mlp_trainable).to(DEVICE)
         else:
             self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh)) / self.RoBASE
             self.Ro.to(DEVICE)
@@ -151,7 +150,6 @@ class BatteryRNNCell_PINN(nn.Module):
         self.qSMax = self.qMax * self.qMaxBASE * self.VolS / self.Vol
         self.qBMax = self.qMax * self.qMaxBASE * self.VolB / self.Vol
 
-
         self.t0 = torch.tensor(10.0).to(DEVICE)
         self.tsn = torch.tensor(90.0).to(DEVICE)
         self.tsp = torch.tensor(90.0).to(DEVICE)
@@ -159,7 +157,6 @@ class BatteryRNNCell_PINN(nn.Module):
         self.U0n = torch.tensor(0.01).to(DEVICE)
         self.VEOD = torch.tensor(3.0).to(DEVICE)
 
-    
 
     def forward(self, inputs, states=None):
 
@@ -174,13 +171,11 @@ class BatteryRNNCell_PINN(nn.Module):
         return output, next_states
 
     def getNextOutput(self, states, i):
+
         other_inputs = torch.tensor([self.qMax, self.qMaxBASE, self.VolS, self.Vol, self.U0n, self.U0p, self.R, self.F])
         other_inputs = other_inputs.repeat(i.size(0), 1)
         other_inputs = other_inputs.to(torch.float)
         i = i.to(torch.float)
-
-       
-
 
         inputs = torch.cat([i, other_inputs], dim=1)
         #print(f"Input shape: {inputs.shape}")
@@ -193,11 +188,7 @@ class BatteryRNNCell_PINN(nn.Module):
         #layer2 = self.lin2(out1)
         #out2 = self.LeakyReLU(layer2)
         layer3 = self.lin3(out1)
-        out = self.ReLU(layer3)
-
-        #print(f"Final out shape:{out.shape}")  
-
-        #Volt, Vep, Ven, Vo, Vsn, Vsp = out.split(1, dim=1)
+        out = self.ReLU(layer3) 
 
         return out
 
@@ -231,13 +222,14 @@ class BatteryRNNCell_PINN(nn.Module):
         return XNew
     
     def get_initial_state(self):
-        self.initBatteryParams(D_trainable=False)
-        if self.q_max_model is not None:
-            self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh).to(DEVICE)) / self.qMaxBASE
+        ##### PAIN LIVES HERE #####
+        #self.initBatteryParams(D_trainable=False)
+        #if self.q_max_model is not None:
+        #    self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh).to(DEVICE)) / self.qMaxBASE
         
-        if self.R_0_model is not None:
-            self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh).to(DEVICE)) / self.RoBASE
-        
+        #if self.R_0_model is not None:
+        #    self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh).to(DEVICE)) / self.RoBASE
+        #### PAIN LIVES ABOVE #######
         qpMin = self.qMax * self.qMaxBASE * self.xpMin
         qpSMin = qpMin * self.VolS / self.Vol
         qpBMin = qpMin * self.VolB / self.Vol
@@ -247,15 +239,16 @@ class BatteryRNNCell_PINN(nn.Module):
 
         if self.initial_state is None:
             initial_state = torch.cat([
-                torch.tensor([292.1]),
-                torch.zeros(3),
-                qnBMax.reshape(1),
-                qnSMax.reshape(1),
-                qpBMin.reshape(1),
-                qpSMin.reshape(1)
+                torch.tensor([292.1]).to(DEVICE),
+                torch.zeros(3).to(DEVICE),
+                qnBMax.reshape(1).to(DEVICE),
+                qnSMax.reshape(1).to(DEVICE),
+                qpBMin.reshape(1).to(DEVICE),
+                qpSMin.reshape(1).to(DEVICE)
             ]).unsqueeze(0).to(DEVICE)
         else:
             initial_state = torch.tensor(self.initial_state).to(DEVICE)
+        # print("initial state has size ",initial_state.shape)
         return initial_state
 
 #This is the true RNN cell

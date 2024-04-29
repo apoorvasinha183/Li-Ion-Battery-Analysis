@@ -5,13 +5,15 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 from battery_data import getDischargeMultipleBatteries
-#from BatteryRNNCell_mlp import BatteryRNN
 from model import get_model
+
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 NUM_CHECK = 1 
 
-###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
+###### FOR REFERENCE : DATA INGESTION STARTS HERE #########
+
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
     target = None
@@ -31,17 +33,17 @@ def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs_array = np.array(inputs)
     target_array = np.array(target)
 
-   
-    #inputs_tensor = torch.tensor(inputs_array, dtype=torch.float32)
-    #target_tensor = torch.tensor(target_array, dtype=torch.float32)
-
     return inputs_array, target_array
 
 # Load battery data
+
 data_RW = getDischargeMultipleBatteries()
-max_idx_to_use = 3 # We are training the battery with constamt current data
+max_idx_to_use = 3 # We are training the battery with constant current data
 max_size = np.max([v[0, 0].shape[0] for k, v in data_RW.items()])
 dt = np.diff(data_RW[1][2, 0])[1]
+
+print(dt)
+
 # Get data tensors
 inputs_array, target_array = get_data_tensor(data_RW, max_idx_to_use, max_size)
 
@@ -64,35 +66,22 @@ for row in np.argwhere((target_array<EOD) | (np.isnan(target_array))):
         inputs_shiffed[row[0],:,0][time_window_size-row[1]:] = inputs_array[row[0],:,0][:row[1]]
         target_shiffed[row[0]] = np.ones(time_window_size) * target_array[row[0]][0]
         target_shiffed[row[0]][time_window_size-row[1]:] = target_array[row[0]][:row[1]]
-#dataset = TensorDataset(inputs_tensor.unsqueeze(-1), target_tensor.unsqueeze(-1))
-#train_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_idx = np.linspace(0,35,6,dtype=int)
-train_idx = [i for i in np.arange(0,36) if i not in val_idx]
+val_idx = np.linspace(0,max_idx_to_use*12-1,6,dtype=int)
+train_idx = [i for i in np.arange(0,max_idx_to_use*12) if i not in val_idx]
 
 ###### FOR REFERENCE : DATA INGESTION ENDS HERE ##########
         
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
         
 # Create the MLP model, optimizer, and criterion
-mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True, version="naive_PINN").to(DEVICE)
-optimizer = optim.Adam(mlp.parameters(), lr=2e-2)
-
-"""def pi_loss(Volt, Vep, Ven, Vo, Vsn, Vsp, targets):
-    mse_loss = nn.MSELoss()
-    targets = targets.permute(0, 2, 1)
-    mse = mse_loss(Volt, targets)
-    phy_feasible_loss = mse_loss(Volt, Vep - Ven - Vo - Vsn - Vsp)
-    return mse + phy_feasible_loss"""
-
+mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True, D_trainable=False, version="naive_PINN").to(DEVICE)
+optimizer = optim.Adam(mlp.parameters(), lr=2e-2) #weight_decay=1e-5
 criterion = nn.MSELoss()
 
-
-
 # Prepare data
-#X = np.linspace(0.0, 1.0, 100).reshape(-1, 1).astype(np.float32)
-#Y = np.hstack([np.linspace(0.85, -0.2, 90), np.linspace(-0.25, -0.8, 10)]).reshape(-1, 1).astype(np.float32)
 X = inputs_shiffed[train_idx,:,:]
 Y = target_shiffed[train_idx,:,np.newaxis]
+
 # Convert data to PyTorch tensors
 X_tensor = torch.from_numpy(X).to(DEVICE).float()
 Y_tensor = torch.from_numpy(Y).to(DEVICE).float()
@@ -105,50 +94,51 @@ data_loader = DataLoader(dataset, batch_size=15, shuffle=True)
 scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 2e-2 if epoch < 800 else (1e-2 if epoch < 1100 else (5e-3 if epoch < 2200 else 1e-3)))
 
 # Training loop
-num_epochs = 1001
+num_epochs = 301
 for epoch in range(num_epochs):
+
     mlp.train()
+
     total_loss = 0.0
+    phys_loss = 0.0
+    model_loss = 0.0
     
 
     for inputs, targets in data_loader:
         inputs.to(DEVICE)
         targets.to(DEVICE)
-        # if torch.cuda.is_available():
-        #     inputs = inputs.cuda()
-        #     targets = targets.cuda()
-
         optimizer.zero_grad()
         
         # Forward pass
         out = mlp(inputs)
-        Volt, Vep, Ven, Vo, Vsn, Vsp = out.split(1, dim=1)
+
+        Volt, Vep, Ven, Vo, Vsn, Vsp = out.permute(0,2,1).split(1, dim=2)
+
         # Compute loss
-        #loss = pi_loss(Volt, Vep, Ven, Vo, Vsn, Vsp, targets)
         loss_acc = criterion(Volt, targets)
-        loss_PI = criterion(Volt,  Vep - Ven - Vo - Vsn - Vsp)
-        print(f"Accuracy Loss: {loss_acc}")
-        print(f"Physics-Informed: {loss_PI}")
-        loss = loss_acc + loss_PI
-        
-        #print(f"Loss: {loss}")
+        #loss_PI = criterion(Volt, Vep - Ven - Vo - Vsn - Vsp)
+        loss = loss_acc#+loss_PI
+
+        v = Vep - Ven - Vo - Vsn - Vsp
+
+
         # Backpropagation
         loss.backward()
 
-        """for name, param in mlp.named_parameters():
-            print(f'Gradient - {name}:')
-            print(param.grad)"""
-
+        # Clip Gradients
+        torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0)
+        
         optimizer.step()
         total_loss += loss.item()
+        model_loss += loss_acc
+       #phys_loss += loss_PI
 
     # Adjust learning rate using scheduler
     scheduler.step()
 
     # Print epoch statistics
-    if epoch % 100 == 0:
-        print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}")
-
+    if epoch % 25 == 0:
+        print(f"Epoch {epoch}, Model Loss: {model_loss / len(data_loader)}, Physics Loss: { phys_loss / len(data_loader)}, Total Loss: {total_loss / len(data_loader)}")  #
 # Save model weights
 torch.save(mlp.state_dict(), 'torch_train/trained_weights_PINN.pth')
 
@@ -160,23 +150,18 @@ X_tensor = torch.from_numpy(X).to(DEVICE)
 Y_tensor = torch.from_numpy(Y).to(DEVICE)
 with torch.no_grad():
     pred = mlp(X_tensor).cpu().numpy()
+    pred = pred[:,0,:]
+    print(pred.shape)
 
-#plt.plot(X, Y, color='gray')
-print("Predictions have shape ",pred.shape)
 for i in range(NUM_CHECK):
-    plt.plot(pred[i,:,0],linestyle='dashed')
+    plt.plot(pred[i,:],linestyle='dashed')
     plt.plot(Y_tensor[i,:,0])
 plt.ylabel('Voltage(V)')
 plt.grid()
-
+plt.ylim(0, 5)
 plt.xlabel('Time')
 plt.savefig('figures/predictionvsreality.png')
 plt.show()
-
-
-
-
-
 
 
 ###### FOR REFERENCE : TRAINING ENDS HERE #########        
