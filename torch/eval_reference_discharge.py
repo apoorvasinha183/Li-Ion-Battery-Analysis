@@ -74,7 +74,7 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 
 ###### FOR REFERENCE : MODEL LOADING STARTS HERE ##########
 mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
-weights_path = 'torch_train/mlp_trained_weights_bias_correction.pth'
+weights_path = 'torch_train/mlp_trained_weights_bias_correction_4.pth'
 mlp_p_weights = torch.load(weights_path)
 
 with torch.no_grad():
@@ -87,7 +87,7 @@ with torch.no_grad():
 
     
 #Ro_qmax_path ='torch_train/Ro_qmax_trained_weights.pth'
-Ro_qmax_path = 'torch_train/mlp_trained_weights_bias_correction.pth'
+Ro_qmax_path = 'torch_train/mlp_trained_weights_bias_correction_4.pth'
 Ro_qmax = torch.load(weights_path)
 
 with torch.no_grad():
