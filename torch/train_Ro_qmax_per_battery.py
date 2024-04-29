@@ -11,7 +11,7 @@ import time
 from model import get_model
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE = torch.device("cpu")
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 1
 BATTERY = 1
 
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
@@ -88,6 +88,7 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 
 
 
+
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
         
 # Create the MLP model, optimizer, and criterion
@@ -137,16 +138,16 @@ for epoch in range(num_epochs):
     mlp.train()
     total_loss = 0.0
     #print("Epochs are ",epoch)
-    for inputs, targets in data_loader:
-        inputs.to(DEVICE)
-        targets.to(DEVICE)
+    for inputs_, targets_ in data_loader:
+        inputs_.to(DEVICE)
+        targets_.to(DEVICE)
 
         optimizer.zero_grad()
         # Forward pass
-        outputs = mlp(inputs)
+        outputs = mlp(inputs_)
 
         # Compute loss
-        loss = criterion(outputs, targets)
+        loss = criterion(outputs, targets_)
 
         # Backpropagation
         loss.backward()
@@ -161,15 +162,48 @@ for epoch in range(num_epochs):
     if epoch % 100 == 0:
         loss_warm_start.append(total_loss / len(data_loader))
         print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}, Time : {time.time()-start}, Ro: {mlp.cell.Ro.data.item()}, qMax: {mlp.cell.qMax.data.item()}")
+        start = time.time()
         for param_group in optimizer.param_groups:
             current_learning_rate = param_group['lr']
             print("Current Learning Rate:", current_learning_rate)
 
 # Save model weights
-torch.save(mlp.state_dict(), 'torch_train/Ro_qmax_trained_weights_battery_{BATTERY}.pth')
+print(mlp.state_dict())
+torch.save(mlp.state_dict(), f'torch_train/Ro_qmax_trained_battery_{BATTERY}.pth')
 trained_parameter_value = [mlp.cell.Ro.data.item(), mlp.cell.qMax.data.item()]
 print("Trained Parameter Value:", trained_parameter_value)
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
+
+
+
+
+
+
+###### FOR REFERENCE : MODEL LOADING STARTS HERE ##########
+
+mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
+weights_path = 'torch_train/mlp_trained_weights.pth'
+mlp_p_weights = torch.load(weights_path)
+
+with torch.no_grad():
+    mlp.cell.MLPp[1].weight.copy_(mlp_p_weights["cell.MLPp.1.weight"])
+    mlp.cell.MLPp[1].bias.copy_(mlp_p_weights['cell.MLPp.1.bias'])
+    mlp.cell.MLPp[3].weight.copy_(mlp_p_weights['cell.MLPp.3.weight'])
+    mlp.cell.MLPp[3].bias.copy_(mlp_p_weights['cell.MLPp.3.bias'])
+    mlp.cell.MLPp[5].weight.copy_(mlp_p_weights['cell.MLPp.5.weight'])
+    mlp.cell.MLPp[5].bias.copy_(mlp_p_weights['cell.MLPp.5.bias'])
+
+# Ro_qmax_path ='torch_train/Ro_qmax_trained_battery_1.pth'
+# Ro_qmax = torch.load(Ro_qmax_path)
+
+# with torch.no_grad():
+#     mlp.cell.qMax.copy_(torch.tensor(2.487970829010098)) 
+#     mlp.cell.Ro.copy_(torch.tensor(0.01193892490118742)) 
+
+###### FOR REFERENCE : MODEL LOADING ENDS HERE ##########
+
+
+
 
 
 ######## Validation is done here ##########
@@ -200,12 +234,14 @@ for i in range(X.shape[0]):
     ax2.spines["right"].set_edgecolor('purple')
     ax2.tick_params(axis='y', colors='purple')
 
-    plt.savefig(f'figures/predictionvsreality_random_walk_unshiffed{i}_Ro_qMax_battery_{BATTERY}.png')
-    # plt.show()
+    plt.savefig(f'figures/predictionvsreality_random_walk_unshiffed_{i}.png')
+    plt.show()
 ######## Validation is done here ##########
 
 
 ######## Validation is done here ##########
+
+
 mlp.eval()
 # Time for the test set
 X = inputs_shiffed[val_idx,:,:]
