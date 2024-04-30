@@ -29,20 +29,20 @@ class BatteryRNNCell_PINN(nn.Module):
         self.initBatteryParams(D_trainable)
 
         # Define the NN layers for NextOutput 
-        self.lin1 = nn.Linear(2+8+1, 34)
-        self.lin3 = nn.Linear(34, 17)
-        self.lin4 = nn.Linear(17, 1)
+        self.lin1 = nn.Linear(2+8+1, 50)
+        self.lin3 = nn.Linear(50, 50)
+        self.lin4 = nn.Linear(50, 1)
         
 
         self.ReLU = nn.ReLU()
         self.LeakyReLU = nn.LeakyReLU()
 
         # Define the NN layers for NextState
-        self.states_lin1 = nn.Linear(11, 22)
-        self.states_lin3 = nn.Linear(22, 22)
-        self.states_lin4 = nn.Linear(22, 8)
+        self.states_lin1 = nn.Linear(11, 50)
+        self.states_lin3 = nn.Linear(50, 50)
+        self.states_lin4 = nn.Linear(50, 8)
 
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(0.10)
 
 
     def initBatteryParams(self,D_trainable):
@@ -131,10 +131,14 @@ class BatteryRNNCell_PINN(nn.Module):
 
         X = self.lin1(X)
         X = self.LeakyReLU(X)
+        if self.train:
+            X = self.dropout(X)
         X = self.lin3(X)
         X = self.LeakyReLU(X)
+        if self.train:
+            X = self.dropout(X)
         X = self.lin4(X)
-        X = self.ReLU(X) 
+        X = self.ReLU(X)
 
         Volt = prev_out - X
 
@@ -159,8 +163,12 @@ class BatteryRNNCell_PINN(nn.Module):
 
         X = self.states_lin1(X)
         X = self.LeakyReLU(X)
+        """if self.train:
+            X = self.dropout(X)"""
         X = self.states_lin3(X)
         X = self.LeakyReLU(X)
+        """if self.train:
+            X = self.dropout(X)"""
         X = self.states_lin4(X)
         XNew = self.ReLU(X)
 

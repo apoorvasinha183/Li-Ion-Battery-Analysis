@@ -96,11 +96,11 @@ dataset = TensorDataset(X_tensor, Y_tensor)
 data_loader = DataLoader(dataset, batch_size=15, shuffle=True)
 
 # Learning rate scheduler
-scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 9.99e-3 if epoch < 50 else (4e-3 if epoch < 150 else (1e-3 if epoch < 1200 else 5e-4)))
+scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 9e-3 if epoch < 60 else (1e-5 if epoch < 200 else (5e-6 if epoch < 400 else (1e-6 if epoch < 500 else 5e-7))))
 
 # Training loop
 print("Starting training...")
-num_epochs = 200
+num_epochs = 600
 for epoch in range(num_epochs):
 
     mlp.train()
@@ -120,6 +120,9 @@ for epoch in range(num_epochs):
 
         # Compute loss
         loss = criterion(pred, targets)
+
+        #print(f"prediction: {pred[1,0:20]}")
+        #print(f"targets:{targets[1,0:20,0]}")
 
         l2_reg = sum(torch.norm(param)**2 for param in mlp.parameters())
 
@@ -158,12 +161,12 @@ X_tensor = torch.from_numpy(X).to(DEVICE)
 Y_tensor = torch.from_numpy(Y).to(DEVICE)
 with torch.no_grad():
     pred = mlp(X_tensor).cpu().numpy()
-print(pred[1,:])
+print(pred[1,:][0])
 print(Y_tensor[1,:,0])
 
 for i in range(NUM_CHECK):
-    plt.plot(pred[i,:],linestyle='dashed')
-    #plt.plot(Y_tensor[i,:,0])
+    plt.plot(pred[1,:][0],linestyle='dashed')
+    plt.plot(Y_tensor[1,:,0])
 plt.ylabel('Voltage(V)')
 plt.grid()
 #plt.ylim(2, 5)
