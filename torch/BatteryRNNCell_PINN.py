@@ -27,72 +27,22 @@ class BatteryRNNCell_PINN(nn.Module):
         self.mlp_trainable = mlp_trainable
 
         self.initBatteryParams(D_trainable)
-        
-        # Initialize MLP
-
-        # Initialize MLPp weights
-        # Load the weights from the .pth file
-        """
-        weights_path = 'torch_train/mlp_initial_weights_PINN.pth'
-        mlp_p_weights = torch.load(weights_path)
-
-        # Assign weights and biases to each layer in the model
-        with torch.no_grad():
-            
-            self.MLPp[1].weight.copy_(mlp_p_weights["model_state_dict"][ "MLPp.1.weight"])
-            self.MLPp[1].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.1.bias'])
-            self.MLPp[3].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.weight'])
-            self.MLPp[3].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.3.bias'])
-            self.MLPp[5].weight.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.weight'])
-            self.MLPp[5].bias.copy_(mlp_p_weights["model_state_dict"]['MLPp.5.bias'])
-
-
-        # Initialize MLPn weights
-        self.MLPp.to(DEVICE)
-
-
-        X = torch.linspace(0.0, 1.0, 100).unsqueeze(1).to(DEVICE)
-
-        Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1).to(DEVICE)
-
-        #This is such a chad move
-        self.MLPn_optim = torch.optim.Adam(self.MLPn.parameters(), lr=2e-2)
-        for _ in range(200):
-            self.MLPn_optim.zero_grad()
-            output = self.MLPn(X)
-            loss = F.mse_loss(output, Y)
-            loss.backward()
-            self.MLPn_optim.step()
-
-        for param in self.MLPn.parameters():
-            param.requires_grad = False
-        self.MLPn.to(DEVICE)
-"""
 
         # Define the NN layers for NextOutput 
-        self.lin1 = nn.Linear(17, 34)
-        #self.lin2 = nn.Linear(34, 17)
-        self.lin3 = nn.Linear(34, 6)
-
-        init.xavier_uniform_(self.lin1.weight)
-        init.xavier_uniform_(self.lin3.weight)
-        #init.xavier_uniform_(self.lin2.weight)
+        self.lin1 = nn.Linear(2+8+1, 34)
+        self.lin3 = nn.Linear(34, 17)
+        self.lin4 = nn.Linear(17, 1)
         
 
-        self.TanH = nn.Tanh()
         self.ReLU = nn.ReLU()
         self.LeakyReLU = nn.LeakyReLU()
 
         # Define the NN layers for NextState
-        self.states_lin1 = nn.Linear(26, 52)
-        #self.states_lin2 = nn.Linear(52, 26)
-        self.states_lin3 = nn.Linear(52, 8)
+        self.states_lin1 = nn.Linear(11, 22)
+        self.states_lin3 = nn.Linear(22, 22)
+        self.states_lin4 = nn.Linear(22, 8)
 
-        #init.xavier_uniform_(self.states_lin2.weight)
-        init.xavier_uniform_(self.states_lin1.weight)
-        init.xavier_uniform_(self.states_lin3.weight)
-
-
+        self.dropout = nn.Dropout(0.5)
 
 
     def initBatteryParams(self,D_trainable):
@@ -158,65 +108,61 @@ class BatteryRNNCell_PINN(nn.Module):
         self.VEOD = torch.tensor(3.0).to(DEVICE)
 
 
-    def forward(self, inputs, states=None):
+    def forward(self, inputs, prev_out, states=None):
 
         if states is None:
             states = self.get_initial_state()
         
-        #print("states have ")
         next_states = self.getNextState(states, inputs)
-        #print("returned next states")
-        output = self.getNextOutput(next_states, inputs)
-        #print("returned next output")
+        
+        output = self.getNextOutput(next_states, inputs, prev_out)
+        
         return output, next_states
 
-    def getNextOutput(self, states, i):
+    def getNextOutput(self, states, i, prev_out):
 
-        other_inputs = torch.tensor([self.qMax, self.qMaxBASE, self.VolS, self.Vol, self.U0n, self.U0p, self.R, self.F])
+        other_inputs = torch.tensor([self.qMax, self.Ro]) # 2
         other_inputs = other_inputs.repeat(i.size(0), 1)
         other_inputs = other_inputs.to(torch.float)
-        i = i.to(torch.float)
+        i = i.to(torch.float) # 1
 
-        inputs = torch.cat([i, other_inputs], dim=1)
-        #print(f"Input shape: {inputs.shape}")
-        #print(f"State shape: {states.shape}")
+        inputs = torch.cat([i, other_inputs], dim=1) # 8
         X = torch.cat([states, inputs], dim=1)
-        #print(f"Pre NN shape: {X.shape}")
 
-        layer1 = self.lin1(X)
-        out1 = self.LeakyReLU(layer1)
-        #layer2 = self.lin2(out1)
-        #out2 = self.LeakyReLU(layer2)
-        layer3 = self.lin3(out1)
-        out = self.ReLU(layer3) 
+        X = self.lin1(X)
+        X = self.LeakyReLU(X)
+        X = self.lin3(X)
+        X = self.LeakyReLU(X)
+        X = self.lin4(X)
+        X = self.ReLU(X) 
 
-        return out
+        Volt = prev_out - X
+
+        return Volt
 
     def getNextState(self, states, i):
 
         # Repeat other_inputs tensor along dimension 0 to match the size of i
-        other_inputs = torch.tensor([self.qMax, self.qMaxBASE, self.VolS, self.kn, self.kp, self.alpha, self.VolB, self.tDiffusion, self.Sn, self.Sp, self.Ro, self.RoBASE, self.R, self.F, self.tsn, self.tsp, self.dt])
+        other_inputs = torch.tensor([self.qMax, self.Ro]) # 2
         other_inputs = other_inputs.repeat(i.size(0), 1)
 
         # Convert other_inputs to Float data type
         other_inputs = other_inputs.to(torch.float)
-        i = i.to(torch.float)
+        i = i.to(torch.float) # 1
 
         # Concatenate i and repeated other_inputs into a single tensor
-        inputs = torch.cat([i, other_inputs], dim=1)
+        inputs = torch.cat([i, other_inputs], dim=1) 
 
         
         # Concatenate states and inputs along dimension 1
-        X = torch.cat([states, inputs], dim=1)
+        X = torch.cat([states, inputs], dim=1) # 8
 
-        
-
-        layer1 = self.states_lin1(X)
-        out1 = self.LeakyReLU(layer1)
-        #layer2 = self.states_lin2(out1)
-        #out2 = self.LeakyReLU(layer2)
-        layer3 = self.states_lin3(out1)
-        XNew = self.ReLU(layer3)
+        X = self.states_lin1(X)
+        X = self.LeakyReLU(X)
+        X = self.states_lin3(X)
+        X = self.LeakyReLU(X)
+        X = self.states_lin4(X)
+        XNew = self.ReLU(X)
 
        
         return XNew
@@ -276,7 +222,11 @@ class BatteryRNN_PINN(nn.Module):
         
         state = state.repeat(inputs.size(0), 1)
         for t in range(inputs.shape[1]):
-            output, state = self.cell(inputs[:,t,:], state)
+            if t==0:
+                prev_out = torch.full((inputs.size(0), 1), 4.2, device=inputs.device)
+            else:
+                prev_out = outputs[-1].squeeze(-1)
+            output, state = self.cell(inputs = inputs[:,t,:], states= state, prev_out=prev_out)
             outputs.append(output.unsqueeze(-1))
 
         
