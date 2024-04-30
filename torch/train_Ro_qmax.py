@@ -171,7 +171,7 @@ for epoch in range(num_epochs):
             print("Current Learning Rate:", current_learning_rate)
 
 # Save model weights
-torch.save(mlp.state_dict(), 'torch_train/Ro_qmax_trained_weights.pth')
+torch.save(mlp.state_dict(), 'torch_train/Ro_qmax_trained.pth')
 trained_parameter_value = [mlp.cell.Ro.data.item(), mlp.cell.qMax.data.item()]
 print("Trained Parameter Value:", trained_parameter_value)
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
