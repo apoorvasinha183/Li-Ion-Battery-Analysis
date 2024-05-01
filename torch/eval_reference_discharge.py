@@ -13,7 +13,7 @@ from model import get_model
 DEVICE = torch.device("cpu")
 EXPERIMENT = False #Compares and plots watm-start vs random initialization
 NUM_EPOCHS = 1001
-NUM_CHECK = 6 # Between 1 and 6 .How many batteries do you want to evaluate
+NUM_CHECK = 1 # Between 1 and 6 .How many batteries do you want to evaluate
 
 
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
@@ -44,7 +44,9 @@ def shift_data(data_dict, max_idx_to_use, max_size):
     EOD = 3.2
     V_0 = 4.19135029  # V adding when I=0 for the shift
     inputs_shifted = inputs.copy()
+    inputs_us = inputs_shifted.copy()
     target_shifted = target.copy()
+    targets_us = target_shifted.copy()
     reach_EOD = np.ones(num_curves, dtype=int) * time_window_size
     for row in np.argwhere((target<EOD) | (np.isnan(target))):
         if reach_EOD[row[0]]>row[1]:
@@ -55,7 +57,7 @@ def shift_data(data_dict, max_idx_to_use, max_size):
             #print("shifted targets are ",target_shifted[row[0]])
             target_shifted[row[0]][time_window_size-row[1]:] = target[row[0]][:row[1]]
    
-    return inputs_shifted, target_shifted
+    return inputs_shifted, target_shifted,inputs_us,targets_us
 
 
 # Load battery data
@@ -65,7 +67,7 @@ max_size = np.max([v[0, 0].shape[0] for k, v in data_RW.items()])
 dt = np.diff(data_RW[1][2, 0])[1]
 
 # Get data tensors
-inputs_shifted, target_shifted = shift_data(data_RW, max_idx_to_use, max_size)
+inputs_shifted, target_shifted,inputs_us,targets_us = shift_data(data_RW, max_idx_to_use, max_size)
 val_idx = np.linspace(0,35,6,dtype=int)
 train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 ###### FOR REFERENCE : DATA INGESTION ENDS HERE ##########
@@ -100,8 +102,8 @@ with torch.no_grad():
 ######## Validation is done here ##########
 mlp.eval()
 # Time for the test set
-X = inputs_shifted[val_idx,:,:]
-Y = target_shifted[val_idx,:,np.newaxis]  
+X = inputs_us[val_idx,:,:]
+Y = targets_us[val_idx,:,np.newaxis]  
 X_tensor = torch.from_numpy(X).to(DEVICE)
 Y_tensor = torch.from_numpy(Y).to(DEVICE)
 with torch.no_grad():
@@ -115,14 +117,16 @@ for i in range(NUM_CHECK):
     ax1.set_xlabel('time')
     ax1.set_ylabel('Voltage [V]')
     ax2 = ax1.twinx()
-    ax1.plot(pred[i,:,0], linestyle='dashed', color='red', label='Voltage Prediction')
+    #ax1.plot(pred[i,:,0], linestyle='dashed', color='red', label='Voltage Prediction')
     ax1.plot(Y_tensor[i,:,0], color='blue', label='Voltage Measured')
     ax2.plot(X_tensor[i,:,0], color='purple', label='Current Measured', alpha=0.5)
     ax2.set_ylabel('Current [I]')
     ax2.yaxis.label.set_color('purple')
     ax2.spines["right"].set_edgecolor('purple')
     ax2.tick_params(axis='y', colors='purple')
-
-    plt.savefig(f'figures/predictionvsreality_reference_discharge_{i}.png')
+    ax2.set_ylim(0,1.1)
+    #plt.savefig(f'figures/predictionvsreality_reference_discharge_{i}.png')
+    plt.title("One Complete Discharge on Constant Load")
+    plt.savefig(f'example_cycle.png')
     plt.show()
 ######## Validation is done here ##########

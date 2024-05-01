@@ -51,7 +51,7 @@ def get_data_tensor(data_dict, max_idx_to_use, max_size):
 
 # Load battery data
 data_RW = getDischargeMultipleBatteries()
-max_idx_to_use = 10 # We are training the battery with constamt current data #This is to force nly one battery data
+max_idx_to_use = 60 # We are training the battery with constamt current data #This is to force nly one battery data
 max_size = np.max([v[0, 0].shape[0] for k, v in data_RW.items()])
 #max_size = 900 #i want to teach the models a step response
 dt = np.diff(data_RW[1][2, 0])[1]
@@ -101,6 +101,7 @@ if not Sanity:
         #mlp.train()
         optimizer = optim.Adam(mlp.parameters(), lr=5e-3)
         criterion = nn.MSELoss().to(DEVICE)
+        loss_fn = lambda y_true, y_pred: torch.max(torch.abs(y_true - y_pred)) # To minimize the maximum voltage error
         param_count = sum(p.numel() for p in mlp.parameters() if p.requires_grad)
         print("Total number of trainable parameters are ",param_count)
         # Prepare data
@@ -114,7 +115,7 @@ if not Sanity:
         print("Xtesor has shape ",X_tensor.shape)
         # Create PyTorch Dataset and DataLoader
         dataset = TensorDataset(X_tensor, Y_tensor)
-        data_loader = DataLoader(dataset, batch_size=8, shuffle=True) #TODO : Make it 30 again
+        data_loader = DataLoader(dataset, batch_size=54, shuffle=True) #TODO : Make it 30 again
         print("I am loading ",len(data_loader))
         # Learning rate scheduler
         #scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 800 else (0.5 if epoch < 1100 else (0.25 if epoch < 2200 else 0.125)))
@@ -142,7 +143,7 @@ if not Sanity:
 
                 # Compute loss
                 loss = criterion(outputs, targets)
-
+                #loss = loss_fn(outputs,targets) #Custom loss
                 # Backpropagation
                 loss.backward()
                 #torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0) #TODO: This sets gradient clipping
@@ -165,7 +166,7 @@ if not Sanity:
                 print("Trained Parameter Value right now :", trained_parameter_value)    
 
         # Save model weights
-        torch.save(mlp.state_dict(), f'torch_train/mlp_trained_weights_bias_correction_{battery}_complete_10_samples.pth')
+        torch.save(mlp.state_dict(), f'torch_train/mlp_trained_weights_bias_correction_{battery}_complete_custom_loss.pth')
         trained_parameter_value = [mlp.cell.qMax.data.item(),mlp.cell.Ro.data.item()]
         print("Trained Parameter Value:", trained_parameter_value)
         if Validate_one:

@@ -10,8 +10,8 @@ import time
 from model import get_model
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE =torch.device("cpu")
-EXPERIMENT = False #Compares and plots watm-start vs random initialization
-NUM_EPOCHS = 3001
+EXPERIMENT = True #Compares and plots watm-start vs random initialization
+NUM_EPOCHS = 1001
 NUM_CHECK = 1 # Between 1 and 6 .How many batteries do you want to evaluate
 Validate = True
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
@@ -146,7 +146,8 @@ for epoch in range(num_epochs):
         print("Trained Parameter Value right now :", trained_parameter_value)     
 
 # Save model weights
-torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
+if not EXPERIMENT:        
+    torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
 trained_parameter_value = [mlp.cell.qMax.data.item(),mlp.cell.Ro.data.item()]
 print("Trained Parameter Value:", trained_parameter_value)
 # Plot predictions
@@ -185,7 +186,7 @@ if EXPERIMENT:
     data_loader = DataLoader(dataset, batch_size=30, shuffle=True)
     print("I am loading ",len(data_loader))
     # Learning rate scheduler
-    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 800 else (0.5 if epoch < 1100 else (0.25 if epoch < 2200 else 0.125)))
+    #scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 800 else (0.5 if epoch < 1100 else (0.25 if epoch < 2200 else 0.125)))
 
     # Training loop
     start = time.time()
@@ -225,8 +226,8 @@ if EXPERIMENT:
             print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}, Time : {time.time()-start}")
 
     #Plot the two
-    plt.plot(loss_warm_start)
-    plt.plot(loss_cold_start)
+    plt.plot(loss_warm_start,label='Warm Start')
+    plt.plot(loss_cold_start,label='Cold Start')
     plt.ylabel('MSE(Loss)')
     plt.grid()
 

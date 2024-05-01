@@ -23,7 +23,7 @@ num_seq = 36
 
 
 batteries =[1,2,3,4,5,6,7]
-#batteries =[1]
+#batteries =[2]
 
 for BATTERY in batteries:
     loss_history_batt = []
@@ -95,7 +95,7 @@ for BATTERY in batteries:
     ###### FOR REFERENCE : MODEL LOADING STARTS HERE ##########
 
     mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
-    weights_path = f'torch_train/mlp_trained_weights_bias_correction_{BATTERY}_complete_10_samples.pth'
+    weights_path = f'torch_train/mlp_trained_weights_bias_correction_{BATTERY}_complete_custom_loss.pth'
     # weights_path = "torch_train/Ro_qmax_trained_battery_1.pth"
     mlp_p_weights = torch.load(weights_path)
 
@@ -170,7 +170,7 @@ for BATTERY in batteries:
         ax2.spines["right"].set_edgecolor('purple')
         ax2.tick_params(axis='y', colors='purple')
 
-        plt.savefig(f'figures/apoorva_baterry_{BATTERY}_unshiffed_{i}_final_project_submission_10samples.png')
+        plt.savefig(f'figures/apoorva_baterry_{BATTERY}_unshiffed_{i}_final_project_submission_50samples.png')
         plt.show()
         #plt.close()
     loss_battery = np.array(loss_battery)
