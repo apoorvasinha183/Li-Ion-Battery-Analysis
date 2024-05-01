@@ -90,7 +90,7 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 ###### FOR REFERENCE : MODEL LOADING STARTS HERE ##########
 
 mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
-weights_path = 'torch_train/mlp_trained_weights_bias_correction_1.pth'
+weights_path = 'torch_train/Ro_qmax_trained_battery_1.pth'
 # weights_path = "torch_train/Ro_qmax_trained_battery_1.pth"
 mlp_p_weights = torch.load(weights_path)
 
@@ -139,7 +139,7 @@ for i in range(X.shape[0]):
     ax2.spines["right"].set_edgecolor('purple')
     ax2.tick_params(axis='y', colors='purple')
 
-    plt.savefig(f'figures/apoorva_baterry_{BATTERY}_unshiffed_{i}.pdf')
+    plt.savefig(f'figures/JLR_baterry_{BATTERY}_unshiffed_{i}.pdf')
     plt.show()
 ######## Validation ends here ##########
 
