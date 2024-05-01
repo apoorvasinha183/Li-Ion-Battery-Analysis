@@ -11,7 +11,7 @@ import time
 from model import get_model
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE = torch.device("cpu")
-NUM_EPOCHS = 1
+NUM_EPOCHS = 1101
 BATTERY = 1
 
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
@@ -92,13 +92,15 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 ###### FOR REFERENCE : TRAINING STARTS HERE #########
         
 # Create the MLP model, optimizer, and criterion
-mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
+mlp = get_model(dt=dt, share_q_r=False, stateful=True).to(DEVICE)
 
 # load trained weights for MLPp
-weights_path = 'torch_train/mlp_trained_weights.pth'
+weights_path = 'torch_train/Ro_qmax_trained_battery_1.pth'
 mlp_p_weights = torch.load(weights_path)
 
 with torch.no_grad():
+    mlp.cell.qMax.copy_(mlp_p_weights['cell.qMax']) 
+    mlp.cell.Ro.copy_(mlp_p_weights['cell.Ro']) 
     mlp.cell.MLPp[1].weight.copy_(mlp_p_weights["cell.MLPp.1.weight"])
     mlp.cell.MLPp[1].bias.copy_(mlp_p_weights['cell.MLPp.1.bias'])
     mlp.cell.MLPp[3].weight.copy_(mlp_p_weights['cell.MLPp.3.weight'])
