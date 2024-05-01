@@ -13,31 +13,31 @@ DEVICE =torch.device("cpu")
 EXPERIMENT = False #Compares and plots watm-start vs random initialization
 NUM_EPOCHS = 1001
 NUM_CHECK = 1 # Between 1 and 6 .How many batteries do you want to evaluate
-Validate = False
+BATTERY = 1
+Validate = True
 
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
     target = None
 
-    for k, v in data_dict.items():
-        for i, d in enumerate(v[1, :max_idx_to_use]):
-            prep_inp = np.full(max_size, np.nan)
-            prep_target = np.full(max_size, np.nan)
-            prep_inp[:len(d)] = d   # Current Sequence
-            prep_target[:len(v[0, :][i])] = v[0, :][i]  # Voltage sequence
-            if inputs is None:
-                inputs = prep_inp
-                target = prep_target
-            else:
-                inputs = np.vstack([inputs, prep_inp])   
-                target = np.vstack([target, prep_target])
+    k = BATTERY  
+    v = data_dict[k]
+    for i, d in enumerate(v[1, :max_idx_to_use]):
+        prep_inp = np.full(max_size, np.nan)
+        prep_target = np.full(max_size, np.nan)
+        prep_inp[:len(d)] = d   # Current Sequence
+        prep_target[:len(v[0, :][i])] = v[0, :][i]  # Voltage sequence
+        if inputs is None:
+            inputs = prep_inp
+            target = prep_target
+        else:
+            inputs = np.vstack([inputs, prep_inp])   
+            target = np.vstack([target, prep_target])
 
-            break
     inputs_array = np.array(inputs)
     target_array = np.array(target)
 
-   
     #inputs_tensor = torch.tensor(inputs_array, dtype=torch.float32)
     #target_tensor = torch.tensor(target_array, dtype=torch.float32)
 
@@ -85,9 +85,30 @@ train_idx = [i for i in np.arange(0,36) if i not in val_idx]
         
 # Create the MLP model, optimizer, and criterion
 mlp = get_model(dt=dt, mlp_trainable=False, share_q_r=False, stateful=True).to(DEVICE)
+
+
+weights_path = 'torch_train/mlp_trained_weights.pth'
+mlp_p_weights = torch.load(weights_path)
+
+with torch.no_grad():
+    mlp.cell.MLPp[1].weight.copy_(mlp_p_weights["cell.MLPp.1.weight"])
+    mlp.cell.MLPp[1].bias.copy_(mlp_p_weights['cell.MLPp.1.bias'])
+    mlp.cell.MLPp[3].weight.copy_(mlp_p_weights['cell.MLPp.3.weight'])
+    mlp.cell.MLPp[3].bias.copy_(mlp_p_weights['cell.MLPp.3.bias'])
+    mlp.cell.MLPp[5].weight.copy_(mlp_p_weights['cell.MLPp.5.weight'])
+    mlp.cell.MLPp[5].bias.copy_(mlp_p_weights['cell.MLPp.5.bias'])
+
+# freeze MLPp
+for param in mlp.cell.MLPp.parameters():
+    param.requires_grad = False
+
 optimizer = optim.Adam(mlp.parameters(), lr=5e-3)
 criterion = nn.MSELoss().to(DEVICE)
+
+
 param_count = sum(p.numel() for p in mlp.parameters() if p.requires_grad)
+print("Total number of trainable parameters are ",param_count)
+
 # print("Total number of trainable parameters are ",param_count)
 # Prepare data
 #X = np.linspace(0.0, 1.0, 100).reshape(-1, 1).astype(np.float32)
@@ -111,7 +132,7 @@ data_loader = DataLoader(dataset, batch_size=30, shuffle=True) #TODO : Make it 3
 # Learning rate scheduler
 #scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 800 else (0.5 if epoch < 1100 else (0.25 if epoch < 2200 else 0.125)))
 untrained_parameter_value = [mlp.cell.qMax.data.item(),mlp.cell.Ro.data.item()]
-# print("UnTrained Parameter Value:", untrained_parameter_value)
+print("UnTrained Parameter Value:", untrained_parameter_value)
 
 # Training loop
 start = time.time()
@@ -136,7 +157,6 @@ for epoch in range(num_epochs):
 
         # Backpropagation
         loss.backward()
-        # torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0) #TODO: This sets gradient clipping
         optimizer.step()
         #scheduler.step()
         total_loss += loss.item()
@@ -154,15 +174,26 @@ for epoch in range(num_epochs):
             loss_val = criterion(Y_pred, Y_test_tensor)
             loss_val_warm_start.append(loss_val.item())
 
-        print(f"Epoch {epoch}, train Loss: {total_loss / len(data_loader)}, val Loss: {loss_val}, Time : {time.time()-start}")
+        print(f"Epoch {epoch}, train Loss: {total_loss / len(data_loader)}, val Loss: {loss_val}, Time : {time.time()-start}, Ro: {mlp.cell.Ro.data.item()}, qMax: {mlp.cell.qMax.data.item()}")
         start = time.time()
     
 
 # Save model weights
-torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
+torch.save(mlp.state_dict(), 'torch_train/Ro_qMax_trained.pth')
 trained_parameter_value = [mlp.cell.qMax.data.item(),mlp.cell.Ro.data.item()]
-# print("Trained Parameter Value:", trained_parameter_value)
+print("Trained Parameter Value:", trained_parameter_value)
 
+
+plt.figure(figsize=(4, 2))
+plt.plot(loss_warm_start, label='train Loss')
+plt.plot(loss_val_warm_start, label='val loss')
+plt.legend()
+plt.ylabel('MSE(Loss)')
+plt.xlabel('Epoch(unit of 100)')
+plt.title('Training loss')
+plt.grid()
+plt.savefig('figures/training_loss.png')
+plt.show()
 
 
 
@@ -289,6 +320,7 @@ if Validate:
 
     #plt.plot(X, Y, color='gray')
     # print("Predictions have shape ",pred.shape)
+    plt.figure(figsize=(4, 2))
     for i in range(NUM_CHECK):
         plt.plot(pred[i,:,0],linestyle='dashed')
         plt.plot(Y_tensor[i,:,0])
@@ -307,12 +339,8 @@ if debug:
 
     mlp.eval()
     # Time for the test set
-    X = inputs_shiffed[train_idx,:,:]
-    # For confidential reasons
-    shape_X = np.shape(X)
-    #print(shape_X)
-
-    Y = target_shiffed[train_idx,:,np.newaxis]  
+    X = inputs_shiffed[val_idx,:,:]
+    Y = target_shiffed[val_idx,:,np.newaxis]  
     X_tensor = torch.from_numpy(X).to(DEVICE)
     Y_tensor = torch.from_numpy(Y).to(DEVICE)
     with torch.no_grad():
@@ -327,7 +355,7 @@ if debug:
     plt.grid()
 
     plt.xlabel('Time')
-    plt.savefig('figures/whatgoesonduringtraining.png')
+    plt.savefig('figures/validation_Ro_qMax.png')
     plt.show()
 
 
