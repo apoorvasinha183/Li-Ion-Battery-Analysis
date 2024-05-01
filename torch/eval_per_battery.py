@@ -124,22 +124,22 @@ with torch.no_grad():
 #plt.plot(X, Y, color='gray')
 print("Predictions have shape ",pred.shape)
 for i in range(X.shape[0]):
-    fig = plt.figure(figsize=(10, 5))
+    fig = plt.figure(figsize=(4, 2))
     ax1 = fig.add_subplot(111)
     ax1.set_xlabel('time')
     ax1.set_ylabel('Voltage [V]')
     ax2 = ax1.twinx()
     ax1.plot(pred[i,:,0], linestyle='dashed', color='red', label='Voltage Prediction')
     ax1.plot(Y_tensor[i,:,0], color='blue', label='Voltage Measured')
-    ax1.legend()
+    # ax1.legend()
     ax2.plot(X_tensor[i,:,0], color='purple', label='Current Measured', alpha=0.5)
-    ax2.legend()
+    # ax2.legend()
     ax2.set_ylabel('Current [I]')
     ax2.yaxis.label.set_color('purple')
     ax2.spines["right"].set_edgecolor('purple')
     ax2.tick_params(axis='y', colors='purple')
 
-    plt.savefig(f'figures/apoorva_baterry_{BATTERY}_unshiffed_{i}.png')
+    plt.savefig(f'figures/apoorva_baterry_{BATTERY}_unshiffed_{i}.pdf')
     plt.show()
 ######## Validation ends here ##########
 
