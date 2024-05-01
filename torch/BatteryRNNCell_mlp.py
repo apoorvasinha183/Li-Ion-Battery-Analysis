@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import sys
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE =torch.device("cpu")
 class BatteryRNNCell(nn.Module):
@@ -18,10 +19,12 @@ class BatteryRNNCell(nn.Module):
         self.q_max_model = q_max_model
         self.R_0_model = R_0_model
         self.mlp_trainable = mlp_trainable
+        #print(" mlp trainable is ",self.mlp_trainable)
         self.state_size = 8
         self.output_size = 1
-        self.initBatteryParams(D_trainable)
-
+        self.qstart = torch.tensor(1.4)
+        self.rostart = torch.tensor(0.015)
+        
         self.MLPp = nn.Sequential(
             nn.Flatten(),
             nn.Linear(1, 8),
@@ -34,7 +37,7 @@ class BatteryRNNCell(nn.Module):
         self.MLPn = nn.Sequential(
             nn.Linear(1, 1)
         )
-
+        
         # Initialize MLPp weights
         # Load the weights from the .pth file
         if self.mlp_trainable:
@@ -67,10 +70,11 @@ class BatteryRNNCell(nn.Module):
                 self.MLPp[3].bias.copy_(mlp_p_weights['cell.MLPp.3.bias'])
                 self.MLPp[5].weight.copy_(mlp_p_weights['cell.MLPp.5.weight'])
                 self.MLPp[5].bias.copy_(mlp_p_weights['cell.MLPp.5.bias'])
-
+            self.qstart = mlp_p_weights["cell.qMax"]
+            self.rostart = mlp_p_weights["cell.Ro"]
             # freeze MLPp
             for param in self.MLPp.parameters():
-                param.requires_grad = False        
+                param.requires_grad = False     
 
         X = torch.linspace(0.0, 1.0, 100).unsqueeze(1).to(DEVICE)
         Y = torch.linspace(-8e-4, 8e-4, 100).unsqueeze(1).to(DEVICE)
@@ -87,7 +91,9 @@ class BatteryRNNCell(nn.Module):
         for param in self.MLPn.parameters():
             param.to(DEVICE)
             param.requires_grad = False
-        self.MLPn.to(DEVICE)    
+        self.MLPn.to(DEVICE) 
+        self.initBatteryParams(D_trainable)
+   
 
     def initBatteryParams(self,D_trainable):
         self.q_max_base_value = 1.0e4 if self.q_max_base_value is None else self.q_max_base_value
@@ -104,6 +110,9 @@ class BatteryRNNCell(nn.Module):
 
         if self.q_max_model is None:
             initial_q_max = torch.tensor(1.4e4 / self.q_max_base_value).to(DEVICE)
+            if not self.mlp_trainable:
+                x= 1
+                #initial_q_max = self.qstart
             self.qMax = nn.Parameter(initial_q_max,requires_grad=True).to(DEVICE)
         else:
             self.qMax = self.q_max_model(torch.tensor(self.curr_cum_pwh)) / self.qMaxBASE
@@ -111,6 +120,10 @@ class BatteryRNNCell(nn.Module):
 
         if self.R_0_model is None:
             initial_R_0 = torch.tensor(0.15 / self.R_0_base_value)
+            if not self.mlp_trainable:
+            #if not True:
+                x = 1
+                #initial_R_0 = self.rostart
             self.Ro = nn.Parameter(initial_R_0,requires_grad=True).to(DEVICE)
         else:
             self.Ro = self.R_0_model(torch.tensor(self.curr_cum_pwh)) / self.RoBASE
@@ -188,9 +201,10 @@ class BatteryRNNCell(nn.Module):
         return Volt
 
     def getNextState(self, X, U):
+        #print("dt is ",self.dt)
         Tb, Vo, Vsn, Vsp, qnB, qnS, qpB, qpS = X.split(1, dim=1)
         i = U
-
+        #print("Current is ",i)
         # print(Tb.shape,Vo.shape,Vsn.shape,Vsp.shape,qnB.shape,qnS.shape,qpB.shape,qpS.shape)
 
         qSMax = (self.qMax * self.qMaxBASE) * self.VolS / self.Vol
@@ -221,6 +235,11 @@ class BatteryRNNCell(nn.Module):
         qpSdot = i + qdotDiffusionBSp
         Jn = i / self.Sn
         VoNominal = i * self.Ro * self.RoBASE
+        #print("Vonomial is ",VoNominal)
+        #print("i is ",i)
+        #print("Resistance is ",self.Ro)
+        #print("Base is ",self.RoBASE)
+        #sys.exit()
         Jp = i / self.Sp
         qnSdot = qdotDiffusionBSn - i
 
@@ -304,6 +323,7 @@ class BatteryRNN(nn.Module):
         self.R_0_base = R_0_base
         self.D_trainable = D_trainable
         self.WARM_START = WARM_START
+        print(" mlp trainable is ",self.mlp_trainable)
         self.cell = BatteryRNNCell(q_max_model=self.q_max_model, R_0_model=self.R_0_model, curr_cum_pwh=self.curr_cum_pwh, initial_state=self.initial_state, dt=self.dt, qMobile=self.qMobile, mlp_trainable=self.mlp_trainable, q_max_base=self.q_max_base, R_0_base=self.R_0_base, D_trainable=self.D_trainable,WARM_START=self.WARM_START)
 
     #Define forward pass which is a for loop
