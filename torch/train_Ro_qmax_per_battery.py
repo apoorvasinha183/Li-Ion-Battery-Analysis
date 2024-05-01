@@ -123,6 +123,12 @@ Y = target_shiffed[train_idx,:, np.newaxis]
 X_tensor = torch.from_numpy(X).to(DEVICE)
 Y_tensor = torch.from_numpy(Y).to(DEVICE)
 
+X_test = inputs_shiffed[val_idx,:,:]
+Y_test = target_shiffed[val_idx,:,np.newaxis]
+# Convert data to PyTorch tensors
+X_test_tensor = torch.from_numpy(X_test).to(DEVICE)
+Y_test_tensor = torch.from_numpy(Y_test).to(DEVICE)
+
 # Create PyTorch Dataset and DataLoader
 dataset = TensorDataset(X_tensor, Y_tensor)
 data_loader = DataLoader(dataset, batch_size=30, shuffle=True)
@@ -136,6 +142,8 @@ print("UnTrained Parameter Value:", untrained_parameter_value)
 start = time.time()
 num_epochs = NUM_EPOCHS
 loss_warm_start = []
+loss_val_warm_start = []
+
 for epoch in range(num_epochs):
     mlp.train()
     total_loss = 0.0
@@ -163,11 +171,16 @@ for epoch in range(num_epochs):
     # Print epoch statistics
     if epoch % 100 == 0:
         loss_warm_start.append(total_loss / len(data_loader))
-        print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}, Time : {time.time()-start}, Ro: {mlp.cell.Ro.data.item()}, qMax: {mlp.cell.qMax.data.item()}")
+
+        # evaluate accuracy at end of training
+        with torch.no_grad():
+            mlp.eval()
+            Y_pred = mlp(X_test_tensor)
+            loss_val = criterion(Y_pred, Y_test_tensor)
+            loss_val_warm_start.append(loss_val.item())
+
+        print(f"Epoch {epoch}, train Loss: {total_loss / len(data_loader)}, val Loss: {loss_val}, Time : {time.time()-start}, Ro: {mlp.cell.Ro.data.item()}, qMax: {mlp.cell.qMax.data.item()}")
         start = time.time()
-        for param_group in optimizer.param_groups:
-            current_learning_rate = param_group['lr']
-            print("Current Learning Rate:", current_learning_rate)
 
 # Save model weights
 print(mlp.state_dict())
@@ -181,96 +194,96 @@ print("Trained Parameter Value:", trained_parameter_value)
 
 
 
-###### FOR REFERENCE : MODEL LOADING STARTS HERE ##########
+# ###### FOR REFERENCE : MODEL LOADING STARTS HERE ##########
 
-mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
-weights_path = 'torch_train/mlp_trained_weights.pth'
-mlp_p_weights = torch.load(weights_path)
-
-with torch.no_grad():
-    mlp.cell.MLPp[1].weight.copy_(mlp_p_weights["cell.MLPp.1.weight"])
-    mlp.cell.MLPp[1].bias.copy_(mlp_p_weights['cell.MLPp.1.bias'])
-    mlp.cell.MLPp[3].weight.copy_(mlp_p_weights['cell.MLPp.3.weight'])
-    mlp.cell.MLPp[3].bias.copy_(mlp_p_weights['cell.MLPp.3.bias'])
-    mlp.cell.MLPp[5].weight.copy_(mlp_p_weights['cell.MLPp.5.weight'])
-    mlp.cell.MLPp[5].bias.copy_(mlp_p_weights['cell.MLPp.5.bias'])
-
-# Ro_qmax_path ='torch_train/Ro_qmax_trained_battery_1.pth'
-# Ro_qmax = torch.load(Ro_qmax_path)
+# mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
+# weights_path = 'torch_train/mlp_trained_weights.pth'
+# mlp_p_weights = torch.load(weights_path)
 
 # with torch.no_grad():
-#     mlp.cell.qMax.copy_(torch.tensor(2.487970829010098)) 
-#     mlp.cell.Ro.copy_(torch.tensor(0.01193892490118742)) 
+#     mlp.cell.MLPp[1].weight.copy_(mlp_p_weights["cell.MLPp.1.weight"])
+#     mlp.cell.MLPp[1].bias.copy_(mlp_p_weights['cell.MLPp.1.bias'])
+#     mlp.cell.MLPp[3].weight.copy_(mlp_p_weights['cell.MLPp.3.weight'])
+#     mlp.cell.MLPp[3].bias.copy_(mlp_p_weights['cell.MLPp.3.bias'])
+#     mlp.cell.MLPp[5].weight.copy_(mlp_p_weights['cell.MLPp.5.weight'])
+#     mlp.cell.MLPp[5].bias.copy_(mlp_p_weights['cell.MLPp.5.bias'])
 
-###### FOR REFERENCE : MODEL LOADING ENDS HERE ##########
+# # Ro_qmax_path ='torch_train/Ro_qmax_trained_battery_1.pth'
+# # Ro_qmax = torch.load(Ro_qmax_path)
 
+# # with torch.no_grad():
+# #     mlp.cell.qMax.copy_(torch.tensor(2.487970829010098)) 
+# #     mlp.cell.Ro.copy_(torch.tensor(0.01193892490118742)) 
 
-
-
-
-######## Validation is done here ##########
-mlp.eval()
-# Time for the test set
-X = inputs[val_idx,:,:]
-Y = target[val_idx,:, np.newaxis]
-X_tensor = torch.from_numpy(X).to(DEVICE)
-Y_tensor = torch.from_numpy(Y).to(DEVICE)
-with torch.no_grad():
-    pred = mlp(X_tensor).cpu().numpy()
-
-#plt.plot(X, Y, color='gray')
-print("Predictions have shape ",pred.shape)
-for i in range(X.shape[0]):
-    fig = plt.figure(figsize=(10, 5))
-    ax1 = fig.add_subplot(111)
-    ax1.set_xlabel('time')
-    ax1.set_ylabel('Voltage [V]')
-    ax2 = ax1.twinx()
-    ax1.plot(pred[i,:,0], linestyle='dashed', color='red', label='Voltage Prediction')
-    ax1.plot(Y_tensor[i,:,0], color='blue', label='Voltage Measured')
-    ax1.legend()
-    ax2.plot(X_tensor[i,:,0], color='purple', label='Current Measured', alpha=0.5)
-    ax2.legend()
-    ax2.set_ylabel('Current [I]')
-    ax2.yaxis.label.set_color('purple')
-    ax2.spines["right"].set_edgecolor('purple')
-    ax2.tick_params(axis='y', colors='purple')
-
-    plt.savefig(f'figures/predictionvsreality_random_walk_unshiffed_{i}.png')
-    plt.show()
-######## Validation is done here ##########
+# ###### FOR REFERENCE : MODEL LOADING ENDS HERE ##########
 
 
-######## Validation is done here ##########
 
 
-mlp.eval()
-# Time for the test set
-X = inputs_shiffed[val_idx,:,:]
-Y = target_shiffed[val_idx,:,np.newaxis]
-X_tensor = torch.from_numpy(X).to(DEVICE)
-Y_tensor = torch.from_numpy(Y).to(DEVICE)
-with torch.no_grad():
-    pred = mlp(X_tensor).cpu().numpy()
 
-#plt.plot(X, Y, color='gray')
-print("Predictions have shape ",pred.shape)
-for i in range(X.shape[0]):
-    fig = plt.figure(figsize=(10, 5))
-    ax1 = fig.add_subplot(111)
-    ax1.set_xlabel('time')
-    ax1.set_ylabel('Voltage [V]')
-    ax2 = ax1.twinx()
-    ax1.plot(pred[i,:,0], linestyle='dashed', color='red', label='Voltage Prediction')
-    ax1.plot(Y_tensor[i,:,0], color='blue', label='Voltage Measured')
-    ax1.legend()
-    ax2.plot(X_tensor[i,:,0], color='purple', label='Current Measured', alpha=0.5)
-    ax2.legend()
-    ax2.set_ylabel('Current [I]')
-    ax2.yaxis.label.set_color('purple')
-    ax2.spines["right"].set_edgecolor('purple')
-    ax2.tick_params(axis='y', colors='purple')
+# ######## Validation is done here ##########
+# mlp.eval()
+# # Time for the test set
+# X = inputs[val_idx,:,:]
+# Y = target[val_idx,:, np.newaxis]
+# X_tensor = torch.from_numpy(X).to(DEVICE)
+# Y_tensor = torch.from_numpy(Y).to(DEVICE)
+# with torch.no_grad():
+#     pred = mlp(X_tensor).cpu().numpy()
 
-    plt.savefig(f'figures/predictionvsreality_random_walk_shiffed{i}_Ro_qMax_battery_{BATTERY}.png')
-    # plt.show()
-######## Validation is done here ##########
+# #plt.plot(X, Y, color='gray')
+# print("Predictions have shape ",pred.shape)
+# for i in range(X.shape[0]):
+#     fig = plt.figure(figsize=(10, 5))
+#     ax1 = fig.add_subplot(111)
+#     ax1.set_xlabel('time')
+#     ax1.set_ylabel('Voltage [V]')
+#     ax2 = ax1.twinx()
+#     ax1.plot(pred[i,:,0], linestyle='dashed', color='red', label='Voltage Prediction')
+#     ax1.plot(Y_tensor[i,:,0], color='blue', label='Voltage Measured')
+#     ax1.legend()
+#     ax2.plot(X_tensor[i,:,0], color='purple', label='Current Measured', alpha=0.5)
+#     ax2.legend()
+#     ax2.set_ylabel('Current [I]')
+#     ax2.yaxis.label.set_color('purple')
+#     ax2.spines["right"].set_edgecolor('purple')
+#     ax2.tick_params(axis='y', colors='purple')
+
+#     plt.savefig(f'figures/predictionvsreality_random_walk_unshiffed_{i}.png')
+#     plt.show()
+# ######## Validation is done here ##########
+
+
+# ######## Validation is done here ##########
+
+
+# mlp.eval()
+# # Time for the test set
+# X = inputs_shiffed[val_idx,:,:]
+# Y = target_shiffed[val_idx,:,np.newaxis]
+# X_tensor = torch.from_numpy(X).to(DEVICE)
+# Y_tensor = torch.from_numpy(Y).to(DEVICE)
+# with torch.no_grad():
+#     pred = mlp(X_tensor).cpu().numpy()
+
+# #plt.plot(X, Y, color='gray')
+# print("Predictions have shape ",pred.shape)
+# for i in range(X.shape[0]):
+#     fig = plt.figure(figsize=(10, 5))
+#     ax1 = fig.add_subplot(111)
+#     ax1.set_xlabel('time')
+#     ax1.set_ylabel('Voltage [V]')
+#     ax2 = ax1.twinx()
+#     ax1.plot(pred[i,:,0], linestyle='dashed', color='red', label='Voltage Prediction')
+#     ax1.plot(Y_tensor[i,:,0], color='blue', label='Voltage Measured')
+#     ax1.legend()
+#     ax2.plot(X_tensor[i,:,0], color='purple', label='Current Measured', alpha=0.5)
+#     ax2.legend()
+#     ax2.set_ylabel('Current [I]')
+#     ax2.yaxis.label.set_color('purple')
+#     ax2.spines["right"].set_edgecolor('purple')
+#     ax2.tick_params(axis='y', colors='purple')
+
+#     plt.savefig(f'figures/predictionvsreality_random_walk_shiffed{i}_Ro_qMax_battery_{BATTERY}.png')
+#     # plt.show()
+# ######## Validation is done here ##########
