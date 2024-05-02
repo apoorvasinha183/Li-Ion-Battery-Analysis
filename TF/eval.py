@@ -265,8 +265,8 @@ fig = plt.figure('MLPn')
 plt.plot(xi, model.layers[0].cell.MLPn(xi[:,np.newaxis]))
 plt.grid()
 #TODO: The best weights are here!
-# np.save('MLPp_best_weights.npy', model.layers[0].cell.MLPp.get_weights())
-# np.save('MLPn_best_weights.npy', model.layers[0].cell.MLPn.get_weights())
+#np.save('MLPp_best_weights.npy', model.layers[0].cell.MLPp.get_weights())
+#np.save('MLPn_best_weights.npy', model.layers[0].cell.MLPn.get_weights())
 
 fig, ax1 = plt.subplots()
 x_axis = np.linspace(0.0,1.0,len(time_axis[:-SIMULATION_OVER_STEPS]))

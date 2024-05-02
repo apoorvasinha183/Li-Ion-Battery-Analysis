@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 from battery_data import BatteryDataFile, getDischargeMultipleBatteries, DATA_PATH, BATTERY_FILES
 import time
-
+import sys
 #from BatteryRNNCell_mlp import BatteryRNN
 from model import get_model
 #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -89,7 +89,7 @@ train_idx = [i for i in np.arange(0,32) if i not in val_idx]
 ###### FOR REFERENCE : MODEL LOADING STARTS HERE ##########
 
 mlp = get_model(dt=dt, mlp=True, share_q_r=False, stateful=True).to(DEVICE)
-weights_path = 'torch_train/mlp_trained_weights.pth'
+weights_path = 'torch_train/mlp_trained_weights_bias_correction_1.pth'
 mlp_p_weights = torch.load(weights_path)
 
 with torch.no_grad():
@@ -100,15 +100,17 @@ with torch.no_grad():
     mlp.cell.MLPp[5].weight.copy_(mlp_p_weights['cell.MLPp.5.weight'])
     mlp.cell.MLPp[5].bias.copy_(mlp_p_weights['cell.MLPp.5.bias'])
 
-Ro_qmax_path ='torch_train/Ro_qmax_trained_weights.pth'
-Ro_qmax = torch.load(weights_path)
+#Ro_qmax_path ='torch_train/Ro_qmax_trained_weights.pth'
+Ro_qmax_path = 'torch_train/mlp_trained_weights_bias_correction_7.pth'
+Ro_qmax = torch.load(Ro_qmax_path)
 
 with torch.no_grad():
     mlp.cell.qMax.copy_(Ro_qmax['cell.qMax']) 
     mlp.cell.Ro.copy_(Ro_qmax['cell.Ro']) 
 ###### FOR REFERENCE : MODEL LOADING ENDS HERE ##########
-
-
+print("Weight I see is ",Ro_qmax['cell.qMax'])
+print("Weight I see is ",Ro_qmax['cell.Ro'])
+sys.exit()
 ######## Validation is done here ##########
 mlp.eval()
 # Time for the test set

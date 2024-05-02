@@ -13,7 +13,7 @@ DEVICE =torch.device("cpu")
 EXPERIMENT = True #Compares and plots watm-start vs random initialization
 NUM_EPOCHS = 1001
 NUM_CHECK = 1 # Between 1 and 6 .How many batteries do you want to evaluate
-Validate = False
+Validate = True
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
@@ -70,7 +70,7 @@ for row in np.argwhere((target_array<EOD) | (np.isnan(target_array))):
         target_shiffed[row[0]][time_window_size-row[1]:] = target_array[row[0]][:row[1]]
 #dataset = TensorDataset(inputs_tensor.unsqueeze(-1), target_tensor.unsqueeze(-1))
 #train_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_idx = np.linspace(0,35,6,dtype=int)
+val_idx = np.linspace(0,35,6,dtype=int) #One per battery
 #val_idx = np.array([0])
 train_idx = [i for i in np.arange(0,36) if i not in val_idx]
 #train_idx = [0]
@@ -96,10 +96,10 @@ Y_tensor = torch.from_numpy(Y).to(DEVICE)
 
 # Create PyTorch Dataset and DataLoader
 dataset = TensorDataset(X_tensor, Y_tensor)
-data_loader = DataLoader(dataset, batch_size=30, shuffle=True) #TODO : Make it 30 again
+data_loader = DataLoader(dataset, batch_size=36, shuffle=False) #TODO : Make it 30 again
 print("I am loading ",len(data_loader))
 # Learning rate scheduler
-#scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 800 else (0.5 if epoch < 1100 else (0.25 if epoch < 2200 else 0.125)))
+scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 300 else (0.5 if epoch < 800 else (0.25 if epoch < 1200 else 0.125)))
 untrained_parameter_value = [mlp.cell.qMax.data.item(),mlp.cell.Ro.data.item()]
 print("UnTrained Parameter Value:", untrained_parameter_value)
 # Training loop
@@ -127,7 +127,7 @@ for epoch in range(num_epochs):
 
         # Backpropagation
         loss.backward()
-        # torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0) #TODO: This sets gradient clipping
+        #torch.nn.utils.clip_grad_norm_(mlp.parameters(), 1.0) #TODO: This sets gradient clipping
         optimizer.step()
         #scheduler.step()
         total_loss += loss.item()
@@ -142,9 +142,12 @@ for epoch in range(num_epochs):
         for param_group in optimizer.param_groups:
             current_learning_rate = param_group['lr']
             print("Current Learning Rate:", current_learning_rate)
+        trained_parameter_value = [mlp.cell.qMax.data.item(),mlp.cell.Ro.data.item()]
+        print("Trained Parameter Value right now :", trained_parameter_value)     
 
 # Save model weights
-torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
+if not EXPERIMENT:        
+    torch.save(mlp.state_dict(), 'torch_train/mlp_trained_weights.pth')
 trained_parameter_value = [mlp.cell.qMax.data.item(),mlp.cell.Ro.data.item()]
 print("Trained Parameter Value:", trained_parameter_value)
 # Plot predictions
@@ -183,7 +186,7 @@ if EXPERIMENT:
     data_loader = DataLoader(dataset, batch_size=30, shuffle=True)
     print("I am loading ",len(data_loader))
     # Learning rate scheduler
-    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 800 else (0.5 if epoch < 1100 else (0.25 if epoch < 2200 else 0.125)))
+    #scheduler = optim.lr_scheduler.LambdaLR(optimizer, lambda epoch: 1 if epoch < 800 else (0.5 if epoch < 1100 else (0.25 if epoch < 2200 else 0.125)))
 
     # Training loop
     start = time.time()
@@ -223,8 +226,8 @@ if EXPERIMENT:
             print(f"Epoch {epoch}, Loss: {total_loss / len(data_loader)}, Time : {time.time()-start}")
 
     #Plot the two
-    plt.plot(loss_warm_start)
-    plt.plot(loss_cold_start)
+    plt.plot(loss_warm_start,label='Warm Start')
+    plt.plot(loss_cold_start,label='Cold Start')
     plt.ylabel('MSE(Loss)')
     plt.grid()
 
@@ -257,8 +260,8 @@ if Validate:
     plt.grid()
 
     plt.xlabel('Time')
-    plt.savefig('figures/predictionvsreality.png')
-    plt.show()
+    plt.savefig('figures/predictionvsreality_mlp_trained.png')
+    #plt.show()
 
 ######## Validation is done here ##########
 

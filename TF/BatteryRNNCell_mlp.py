@@ -58,8 +58,8 @@ class BatteryRNNCell(Layer):
             layer.trainable=mlp_trainable
 
         for layer in self.MLPn.layers:
-            # layer.trainable=mlp_trainable
-            layer.trainable=False
+            layer.trainable=mlp_trainable
+            #layer.trainable=False
 
     def initBatteryParams(self, batch_size, D_trainable):
         P = self
@@ -357,6 +357,7 @@ class BatteryRNNCell(Layer):
             initial_state_0_3 = tf.ones([P.qMax.shape[0], 4], dtype=self.dtype) \
                 * tf.constant([292.1, 0.0, 0.0, 0.0], dtype=self.dtype)
             initial_state = tf.concat([initial_state_0_3, tf.expand_dims(qnBMax, axis=1), tf.expand_dims(qnSMax, axis=1), tf.expand_dims(qpBMin, axis=1), tf.expand_dims(qpSMin, axis=1)], axis=1)
+            #tf.print("Intial state is ",initial_state)       
         else:
             initial_state = ops.convert_to_tensor(self.initial_state, dtype=self.dtype)
 

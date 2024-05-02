@@ -62,7 +62,7 @@ inputs = np.hstack([inputs, inputs[:, -SIMULATION_OVER_STEPS:]])
 time_window_size = inputs_shiffed.shape[1]
 
 
-checkpoint_filepath = './training/cp_mlp_save4.ckpt'
+checkpoint_filepath = './training/cp_mlp.ckpt'
 
 base_model = get_model(batch_input_shape=(36,1,1), dt=dt, mlp=True, share_q_r=False)
 base_model.load_weights(checkpoint_filepath)

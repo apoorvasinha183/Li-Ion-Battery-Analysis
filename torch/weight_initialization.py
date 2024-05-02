@@ -95,7 +95,7 @@ mlp.eval()
 with torch.no_grad():
     pred = mlp(X_tensor).cpu().numpy()
 
-plt.plot(X, Y, color='gray')
-plt.plot(X, pred)
-plt.grid()
-plt.show()
+#plt.plot(X, Y, color='gray')
+#plt.plot(X, pred)
+#plt.grid()
+#plt.show()

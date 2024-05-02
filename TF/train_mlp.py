@@ -4,7 +4,7 @@ from time import time
 import matplotlib
 import matplotlib.pyplot as plt
 import tensorflow as tf
-
+import sys
 from model import get_model
 
 from battery_data import getDischargeMultipleBatteries
@@ -25,7 +25,10 @@ max_idx_to_use = 3
 max_size = np.max([ v[0,0].shape[0] for k,v in data_RW.items() ])
 
 dt = np.diff(data_RW[1][2,0])[1]
-
+#print("Time step is ",data_RW[1][2,0])
+#for keys in data_RW:
+#    print(keys)
+#sys.exit()
 inputs = None
 target = None
 #TODO : Readout the dataset
@@ -66,9 +69,9 @@ for row in np.argwhere((target<EOD) | (np.isnan(target))):
 #TRAIN-TEST SPLIT
 val_idx = np.linspace(100,120,6,dtype=int)
 train_idx = [i for i in np.arange(0,36) if i not in val_idx]
-print("train idx has ",len(train_idx))
+#print("train idx has ",len(train_idx))
 time_window_size = inputs.shape[1]  # 310
-print("What i want for christmas is ",inputs[train_idx,:,:].shape[0],time_window_size,inputs.shape[2])
+#print("What i want for christmas is ",inputs[train_idx,:,:].shape[0],time_window_size,inputs.shape[2])
 # Assume get code is 
 model = get_model(batch_input_shape=(inputs[train_idx,:,:].shape[0],time_window_size,inputs.shape[2]), dt=dt, mlp=True, share_q_r=False, stateful=True)
 
@@ -107,17 +110,17 @@ def scheduler(epoch):
 
 scheduler_cb = tf.keras.callbacks.LearningRateScheduler(scheduler)
 
-EPOCHS = 1000
+EPOCHS = 3000
 
 
 callbacks = [model_checkpoint_callback,resetStateCallback()]
-print("inputs shifted has size ",inputs_shiffed.shape)
-print("Target shiffed has size ",target_shiffed.shape)
+#print("inputs shifted has size ",inputs_shiffed.shape)
+#print("Target shiffed has size ",target_shiffed.shape)
 BLOCK = False
 weights = model.get_weights()
-print("Weights before")
-print(weights)
-print("Training start..")
+#print("Weights before")
+#print(weights)
+#print("Training start..")
 if not BLOCK:
     start = time()
     
@@ -126,8 +129,8 @@ if not BLOCK:
     print("Train time: {:.2f} s - {:.3f} s/epoch ".format(duration, duration/EPOCHS))
 
     np.save('./training/history_mlp.npy', history.history)
-print("Training end..")
-print("Weights after")    
-weights = model.get_weights()
-print(weights)    
+#print("Training end..")
+#print("Weights after")    
+#weights = model.get_weights()
+#print(weights)    
 #print("Weights after")
