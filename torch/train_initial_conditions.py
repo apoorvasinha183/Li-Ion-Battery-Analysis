@@ -18,7 +18,7 @@ battery_num = [1,2,3,4,5,6,7,8]
 #battery_num=[2]
 Validate = False
 Validate_one = True
-Sanity = False
+Sanity = True
 ###### FOR REFERENCE : DATA INGESTION STARTS HERE ##########
 def get_data_tensor(data_dict, max_idx_to_use, max_size):
     inputs = None
